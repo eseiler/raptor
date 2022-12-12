@@ -18,4 +18,5 @@ raptor_require_test ()
 
 add_custom_target (cli_test)
 
-add_cli_test (bin_influence_benchmark.cpp)
+add_unit_test (bin_influence_benchmark.cpp)
+add_unit_test (lzcount_benchmark.cpp)
