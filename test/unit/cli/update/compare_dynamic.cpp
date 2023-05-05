@@ -81,7 +81,7 @@ size_t number_of_queries = number_of_lines(query_file);
                 break;
             }
             std::string bin_filename{};
-            bin_filename += line_view.substr(1, line_view.find('\t'));
+            bin_filename += line_view.substr(line_view.find('\t'));
             filenames.push_back(bin_filename);
         }            //  skip line
 
@@ -89,30 +89,29 @@ size_t number_of_queries = number_of_lines(query_file);
             std::getline(search_result, line);
             std::string_view line_view{line};
             std::string bin_filename_number{};
-            bin_filename_number += line_view.substr(1, line_view.find('\t'));
-            std::cout << bin_filename_number << std::flush;
-            int bin_number = std::stoi( bin_filename_number ); // convert to integer
-            query_results.push_back(filenames[bin_number]);
+            auto n = line_view.find('\t');
+            if (std::string::npos == n){
+                query_results.push_back("");
+                std::cout << "query " << i << " was not found in index " << filename << std::flush;
+            }
+            else {
+                bin_filename_number += line_view.substr(n);
+                int bin_number = std::stoi( bin_filename_number ); // convert to integer
+                query_results.push_back(filenames[bin_number]);
+            }
         }
     return(query_results);
-    // TODO : it is more complicated, because I have to map the number of the UB to the filename, and compare those.
     }
 
     static inline void compare_two_searches(
             std::string_view const filename1,
             std::string_view const filename2){
 
-//        std::ifstream search_result1{filename1.data()};
-//        std::ifstream search_result2{filename2.data()};
-//        std::string line1;
-//        std::string line2;
         std::vector<std::string> query_result1 = extract_results(filename1);
         std::vector<std::string> query_result2 = extract_results(filename2);
 
         for (size_t i = 0; i < number_of_queries; ++i)
         {
-//            ASSERT_TRUE(std::getline(search_result1, line1));
-//            ASSERT_TRUE(std::getline(search_result2, line2));
             EXPECT_EQ(query_result1[i], query_result2[i]);
             }
 

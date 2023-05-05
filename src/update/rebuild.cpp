@@ -76,7 +76,8 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
     auto kmer_counts_filenames = get_kmer_counts(index, filenames_subtree);
     //1.3) Define how to split the IBF, in terms of merged bin indexes and user bin filenames
     auto split_filenames = find_best_split(kmer_counts_filenames, number_of_splits);
-    auto split_idxs = split_ibf(index_tuple, index, number_of_splits); // returns the new indices
+    auto split_idxs = split_ibf(index_tuple, index, number_of_splits); // returns the new indices to attach the subtree
+    // TODO check if IBF has been resized and if a rebuild should be triggered. if > tmax
     //1.4) remove IBFs of the to-be-rebuild subtree from the  index.
     remove_ibfs(index, next_ibf_idx);
 
@@ -152,7 +153,7 @@ std::vector<std::vector<std::tuple<size_t, std::string>>> find_best_split( //ren
         && filename_idx < kmer_counts_filenames.size()){ // and while we did not reach the last file
             cumulative_sum += std::get<0>(kmer_counts_filenames[filename_idx]);
             filename_idx += 1;
-        }
+        } // TODO if one split consists of one filename, than it should be placed directly on the higher level.
         split_filenames.push_back(std::vector(        // create a new vector with filename indices.
             std::ranges::next(kmer_counts_filenames.begin(), split_idx, kmer_counts_filenames.end()),  // std::ranges::next(iterator, number, bound) is the same as iterator + number, but bound: it cannot go out of range.
             std::ranges::next(kmer_counts_filenames.begin(), filename_idx + 1, kmer_counts_filenames.end())));

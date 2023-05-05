@@ -15,32 +15,32 @@
 namespace raptor::hibf
 {
 
-
+// for merged bins
 // automatically does naive splitting if number_of_bins > 1
-void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
-                     robin_hood::unordered_flat_set<size_t> const & kmers,
-                     size_t const number_of_bins,
-                     size_t const bin_index, // Bin_index: xth bin in an IBF
-                     seqan3::interleaved_bloom_filter<> & ibf,
-                     bool is_root)
-{
-    size_t const chunk_size = kmers.size() / number_of_bins + 1;
-    size_t chunk_number{};
-
-    for (auto chunk : kmers | seqan3::views::chunk(chunk_size))
-    {
-        assert(chunk_number < number_of_bins);
-        seqan3::bin_index const bin_idx{bin_index + chunk_number};
-        ++chunk_number;
-        for (size_t const value : chunk)
-        {
-            ibf.emplace(value, bin_idx);
-            if (!is_root)
-                parent_kmers.insert(value);
-        }
-    }
-
-}
+//void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
+//                     robin_hood::unordered_flat_set<size_t> const & kmers,
+//                     size_t const number_of_bins,
+//                     size_t const bin_index, // Bin_index: xth bin in an IBF
+//                     seqan3::interleaved_bloom_filter<> & ibf,
+//                     bool is_root)
+//{
+//    size_t const chunk_size = kmers.size() / number_of_bins + 1;
+//    size_t chunk_number{};
+//
+//    for (auto chunk : kmers | seqan3::views::chunk(chunk_size))
+//    {
+//        assert(chunk_number < number_of_bins);
+//        seqan3::bin_index const bin_idx{bin_index + chunk_number};
+//        ++chunk_number;
+//        for (size_t const value : chunk)
+//        {
+//            ibf.emplace(value, bin_idx);
+//            if (!is_root)
+//                parent_kmers.insert(value);
+//        }
+//    }
+//
+//}
 /*!\brief Insertions of an UB into an IBF //TODO DOC
  * \details The algorithm inserts the k-mers of a UB in one or more TBs
  * \param[in] kmers the set of kmers to be stored

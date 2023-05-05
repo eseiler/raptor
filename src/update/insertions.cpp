@@ -116,10 +116,10 @@ void insert_ubs(update_arguments const & update_arguments,
             if (std::get<0>(rebuild_index_tuple) < index.ibf().ibf_vector.size()) // If the ibf_idx is lower than the total number of IBFs (the initilization value), then the respective IBF needs to be rebuild.
                 partial_rebuild(rebuild_index_tuple, index, update_arguments);
             size_t const ibf_idx = std::get<0>(index_triple);
-            if (index.ibf().ibf_vector[ibf_idx].bin_count() > 64){ // If an ibf grows out of the tolerated t_max, a full rebuild is triggered
+            if (index.ibf().ibf_vector[ibf_idx].bin_count() > index.ibf().t_max){ // If an ibf grows out of the tolerated t_max, a full rebuild is triggered
                 // if possible update tmax before really rebuilding: max_hibf_id = determine_best_number_of_technical_bins(data, config);
                 if (ibf_idx > 0){
-                    partial_rebuild(index.ibf().previous_ibf_id[ibf_idx], index, update_arguments); // is this really necessary?
+                    partial_rebuild(index.ibf().previous_ibf_id[ibf_idx], index, update_arguments); // is this really necessary? TODO or do this only for the top level?
                 }
                 else full_rebuild(index, update_arguments);
             }
@@ -299,17 +299,18 @@ uint64_t find_empty_bin_idx(raptor_index<index_structure::hibf> & index, size_t 
     size_t ibf_bin_count = index.ibf().ibf_vector[ibf_idx].bin_count();
     size_t bin_idx{0}; // The variable is initialized outside the for loop, such that afterwards it can still be used.
     for (; bin_idx + number_of_bins < ibf_bin_count; bin_idx++){ // This could be implemented more efficiently.
-        if (std::reduce(&index.ibf().occupancy_table[ibf_idx][bin_idx],
-                        &index.ibf().occupancy_table[ibf_idx][bin_idx+number_of_bins])==0){ //empty bin
-            break;
+        if (std::reduce(&index.ibf().occupancy_table[ibf_idx][bin_idx], // reduce sums over all values in the range
+                        &index.ibf().occupancy_table[ibf_idx][bin_idx+number_of_bins])==0){ //this range is empty, so a good location has been found. Std reduce should go from [bin_idx] to [bin_idx + 1]
+            return bin_idx;
         }
-    } // If the 'break' has not been triggered, i.e. bin_idx = ibf_bin_count, no appropriate empty bin has been found and the bin idx will be the size of the IBF,
-    if (bin_idx == ibf_bin_count - 1){  // then the IBF must be resized.
-        double EB_percentage = 0.1; // TODO should be an input parameter, same as the number of empty bins.
-        std::cout << "Resize the IBF at index: " << ibf_idx << "\n";
-        size_t new_ibf_bin_count = next_multiple_of_64(std::max((size_t) std::round((1+EB_percentage)*ibf_bin_count), ibf_bin_count + number_of_bins));
-        index.ibf().resize_ibf(ibf_idx, new_ibf_bin_count);
-    }
+    } // If nothing has been returned, no appropriate empty bin has been found and the bin idx will be the size of the IBF,
+    bin_idx = ibf_bin_count; // then the IBF must be resized.
+    double EB_percentage = 0.1; // TODO should be an input parameter, same as the number of empty bins.
+    std::cout << "Resize the IBF at index: " << ibf_idx << "\n" << std::flush;
+    size_t new_ibf_bin_count = next_multiple_of_64(std::max((size_t) std::round((1+EB_percentage)*ibf_bin_count), ibf_bin_count + number_of_bins));
+    index.ibf().resize_ibf(ibf_idx, new_ibf_bin_count);
+    //std::fill(&index.ibf().occupancy_table[ibf_idx][ibf_bin_count], &index.ibf().occupancy_table[ibf_idx][new_ibf_bin_count], 0); // move to H_i_b_f.cpp
+    assert(index.ibf().occupancy_table[ibf_idx][bin_idx] == 0);
     return bin_idx;
 }
 

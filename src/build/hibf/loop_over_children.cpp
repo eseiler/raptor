@@ -19,6 +19,7 @@ namespace raptor::hibf
 template <seqan3::data_layout data_layout_mode>
 void loop_over_children(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                         seqan3::interleaved_bloom_filter<> & ibf,
+                        size_t ibf_pos_cur, // position of the current ibf, 'ibf'
                         std::vector<int64_t> & ibf_positions,
                         lemon::ListDigraph::Node const & current_node,
                         build_data<data_layout_mode> & data,
@@ -51,7 +52,9 @@ void loop_over_children(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                 size_t const mutex_id{parent_bin_index / 64};
                 std::lock_guard<std::mutex> guard{local_ibf_mutex[mutex_id]};
                 ibf_positions[parent_bin_index] = ibf_pos;
-                insert_into_ibf(parent_kmers, kmers, 1, parent_bin_index, ibf, is_root);
+                insert_into_ibf(parent_kmers, kmers,
+                                 std::make_tuple((uint64_t) ibf_pos_cur, (uint64_t) parent_bin_index, (uint64_t) 1),
+                                 data.hibf, ibf, is_root);
             }
         }
     };
@@ -77,6 +80,7 @@ void loop_over_children(robin_hood::unordered_flat_set<size_t> & parent_kmers,
 
 template void loop_over_children<seqan3::data_layout::uncompressed>(robin_hood::unordered_flat_set<size_t> &,
                                                                     seqan3::interleaved_bloom_filter<> &,
+                                                                    size_t,
                                                                     std::vector<int64_t> &,
                                                                     lemon::ListDigraph::Node const &,
                                                                     build_data<seqan3::data_layout::uncompressed> &,
@@ -86,6 +90,7 @@ template void loop_over_children<seqan3::data_layout::uncompressed>(robin_hood::
 
 template void loop_over_children<seqan3::data_layout::compressed>(robin_hood::unordered_flat_set<size_t> &,
                                                                   seqan3::interleaved_bloom_filter<> &,
+                                                                  size_t,
                                                                   std::vector<int64_t> &,
                                                                   lemon::ListDigraph::Node const &,
                                                                   build_data<seqan3::data_layout::compressed> &,

@@ -57,7 +57,7 @@ size_t hierarchical_build(robin_hood::unordered_flat_set<size_t> & parent_kmers,
     kmers.clear(); // reduce memory peak
 
     // Parse all other children (merged bins) of the current ibf
-    loop_over_children(parent_kmers, ibf, ibf_positions, current_node, data, arguments, is_root, empty_bin_kmers);
+    loop_over_children(parent_kmers, ibf, ibf_pos, ibf_positions, current_node, data, arguments, is_root, empty_bin_kmers);
 
     // If max bin was a merged bin, process all remaining records, otherwise the first one has already been processed
     size_t const start{(current_node_data.favourite_child != lemon::INVALID) ? 0u : 1u};
