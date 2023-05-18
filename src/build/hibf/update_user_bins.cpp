@@ -29,6 +29,8 @@ void update_user_bins(build_data<data_layout_mode> & data,
     user_bin_filenames.pop_back();
 
     std::fill_n(filename_indices.begin() + record.bin_indices.back(), record.number_of_bins.back(), idx);
+    // TODO adapt this code if you want to remove empty bins from the filenames.
+    // Use: if (std::filesystem::path(record.filenames[0]).extension() !=".empty_bin")
 }
 
 template void update_user_bins<seqan3::data_layout::uncompressed>(build_data<seqan3::data_layout::uncompressed> &,

@@ -38,6 +38,7 @@ void insert_ub(std::string filename_ub, std::string filename_index){
 //    EXPECT_EQ(result_no_ebs.out, std::string{});
 //    EXPECT_EQ(result_no_ebs.err, std::string{});
 //    RAPTOR_ASSERT_ZERO_EXIT(result_no_ebs);
+    system("/usr/bin/time echo hello -f\"%M\" > cmd_test21.txt");
 
     clock_gettime(CLOCK_MONOTONIC, &end);
 

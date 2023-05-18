@@ -1,42 +1,41 @@
 //#include <raptor/search/search_single.hpp> // to make sure index_structure::hibf_compresse exists here.
 #include <lemon/list_graph.h> /// Must be first include.
 
+#include <chopper/layout/execute.hpp>
+#include <chopper/set_up_parser.hpp>
 #include <raptor/update/load_hibf.hpp>
 #include <raptor/update/insertions.hpp>
 #include <raptor/build/store_index.hpp>
-#include <chopper/detail_apply_prefix.hpp>
-#include <chopper/layout/execute.hpp>
-#include <chopper/count/execute.hpp>
-#include <chopper/set_up_parser.hpp>
 #include <raptor/update/rebuild.hpp>
-
 #include <raptor/build/hibf/chopper_build.hpp>
 #include <raptor/build/hibf/create_ibfs_from_chopper_pack.hpp> // when adding this, it recognizes std as raptor::std
 #include <raptor/build/hibf/insert_into_ibf.hpp>
+#include <raptor/build/hibf/compute_kmers.hpp>
+#include <chopper/data_store.hpp>
+#include <chopper/layout/insert_empty_bins.hpp>
 
 namespace raptor
 {
 
-//!\brief helper function to convert vector of strings to Set
+//!\brief helper function to convert vector of strings to set
 std::set<std::string> convert_to_set(std::vector<std::string> vector)
 {
     std::set<std::string> set;
-    for (std::string x : vector) set.insert(x);
+    for (std::string string : vector)  if (string != " " and string != "") set.insert(string);
     return set;
 }
 
 //!\brief Rebuilds the complete index. Otherwise works similar to partial rebuild.
 void full_rebuild(raptor_index<index_structure::hibf> & index,
-                  update_arguments const & update_arguments) { // TODO create a command that triggers a full rebuild
+                  update_arguments const & update_arguments) {
     index.ibf().initialize_ibf_sizes();
     //0) Create layout arguments
     chopper::configuration layout_arguments = layout_config(index, update_arguments); // create the arguments to run the layout algorithm with.
-    //1) Store kmer counts together with the filenames as text file.
+    //1) Obtain kmer counts together with the filenames
     std::vector<std::string> filenames = index.ibf().user_bins.user_bin_filenames; // all filenames
     auto kmer_counts_filenames = get_kmer_counts(index, convert_to_set(filenames));
-    write_kmer_counts(kmer_counts_filenames, layout_arguments.count_filename);
     //2) call chopper layout on the stored filenames.
-    call_layout(layout_arguments); // TODO make sure the new version of chopper is used.
+    call_layout(kmer_counts_filenames, layout_arguments);
     //3) call hierarchical build.
     raptor_index<index_structure::hibf> new_index{}; //create the empty HIBF of the subtree.
     build_arguments build_arguments = build_config(layout_arguments.data_file, update_arguments, layout_arguments); // create the arguments to run the build algorithm with.
@@ -47,6 +46,24 @@ void full_rebuild(raptor_index<index_structure::hibf> & index,
     index.ibf().initialize_previous_ibf_id();
     index.ibf().initialize_ibf_sizes();
     std::filesystem::remove_all("tmp");
+}
+
+bool check_tmax_rebuild(raptor_index<index_structure::hibf> & index, size_t ibf_idx,
+                        update_arguments const & update_arguments){
+    if (index.ibf().ibf_vector[ibf_idx].bin_count() > index.ibf().t_max){ // If an ibf grows out of the tolerated t_max, a full rebuild is triggered
+        index.ibf().update_tmax(); // first update the t_max
+        if (index.ibf().ibf_vector[ibf_idx].bin_count() > index.ibf().t_max){
+            if (ibf_idx > 0 and update_arguments.tmax_condition){
+                partial_rebuild(index.ibf().previous_ibf_id[ibf_idx], index, update_arguments); // if update_arguments.tmax_condition is false, then the t_max only holds for the top level.
+                return true;
+            }
+            else {
+                full_rebuild(index, update_arguments);
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 /*!\brief Does a partial rebuild for the subtree at index ibf_idx
@@ -63,10 +80,10 @@ void full_rebuild(raptor_index<index_structure::hibf> & index,
  */
 void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
                   raptor_index<index_structure::hibf> & index,
-                  update_arguments const & update_arguments,
+                  update_arguments const & update_arguments, //TODO? add argument with filename + kmer count to be added.
                   int number_of_splits) // instead of setting a default parameter here, add this to the update arguments
 {
-    std::cout << "Partial rebuild \n";
+    std::cout << "Partial rebuild" << std::flush;
     size_t ibf_idx = std::get<0>(index_tuple);
     size_t bin_idx = std::get<1>(index_tuple);
     size_t next_ibf_idx = index.ibf().next_ibf_id[ibf_idx][bin_idx];
@@ -76,30 +93,38 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
     auto kmer_counts_filenames = get_kmer_counts(index, filenames_subtree);
     //1.3) Define how to split the IBF, in terms of merged bin indexes and user bin filenames
     auto split_filenames = find_best_split(kmer_counts_filenames, number_of_splits);
-    auto split_idxs = split_ibf(index_tuple, index, number_of_splits); // returns the new indices to attach the subtree
-    // TODO check if IBF has been resized and if a rebuild should be triggered. if > tmax
+
+    auto split_idxs = split_ibf(index_tuple, index, update_arguments, number_of_splits); // returns the new indices to attach the subtree
+
+    //1.5) Check the IBF bin count exceeds tmax, which might be possible if it has been resized. If tmax is exceeded, another build will be triggered inside the 'check tmax' function
+    if (check_tmax_rebuild(index, ibf_idx, update_arguments)) return;
+
     //1.4) remove IBFs of the to-be-rebuild subtree from the  index.
     remove_ibfs(index, next_ibf_idx);
 
     for (int split = 0; split < number_of_splits; split++){ // for each subindex that is rebuild.
         if (split_filenames[split].size()) {
-            //0) Create layout arguments
-            chopper::configuration layout_arguments = layout_config(index, update_arguments, std::to_string(split)); // create the arguments to run the layout algorithm with.
-            //write_filenames(layout_arguments.data_file, filenames_subtree); // should be run if chopper count is run.
-            //1) Store kmer counts together with the filenames as text file.
-            write_kmer_counts(split_filenames[split], layout_arguments.count_filename);
-            //2) call chopper layout on the stored filenames.
-            call_layout(layout_arguments);
-            //3) call hierarchical build.
-            raptor_index<index_structure::hibf> subindex{}; //create the empty HIBF of the subtree.
-            build_arguments build_arguments = build_config(layout_arguments.data_file, update_arguments, layout_arguments); // create the arguments to run the build algorithm with.
-            robin_hood::unordered_flat_set<size_t> root_kmers = call_build(build_arguments, subindex, false); // the last argument sets the 'is_root' parameter to false such that kmers are added to `parent_kmers`. However, this causes that no shuffling takes place reducing the efficiency a bit. This could be further optimized perhaps by adding an extra parameter.
-            insert_into_ibf(root_kmers, std::make_tuple(ibf_idx, split_idxs[split], 1), index, std::make_tuple(0,0));       // also fills the (new) MB.
-            //4) initialize additional datastructures for the subindex.
-            subindex.ibf().initialize_previous_ibf_id();
-            subindex.ibf().initialize_ibf_sizes();
-            //5) merge the index of the HIBF of the newly obtained subtree with the original index.
-            attach_subindex(index, subindex, std::make_tuple(ibf_idx, split_idxs[split]));
+            if (split_filenames[split].size() == 1){ // if the subtree consists of a single user bin, than the user bin will be directly placed on the higher-level IBF.
+                robin_hood::unordered_flat_set<size_t> kmers{}; // Initialize kmers.
+                std::vector<std::string> filename = {std::get<1>(split_filenames[split][0])};
+                raptor::hibf::compute_kmers(kmers, update_arguments, filename);
+                insert_into_ibf(kmers, std::make_tuple(ibf_idx, split_idxs[split], 1), index, std::make_tuple(0,0));       // fills the empty bin. no need to insert into parents.
+            }else{
+                //0) Create layout arguments
+                chopper::configuration layout_arguments = layout_config(index, update_arguments, std::to_string(split)); // create the arguments to run the layout algorithm with.
+                //2) call chopper layout on the stored filenames.
+                call_layout(kmer_counts_filenames, layout_arguments);
+                //3) call hierarchical build.
+                raptor_index<index_structure::hibf> subindex{}; //create the empty HIBF of the subtree.
+                build_arguments build_arguments = build_config(layout_arguments.data_file, update_arguments, layout_arguments); // create the arguments to run the build algorithm with.
+                robin_hood::unordered_flat_set<size_t> root_kmers = call_build(build_arguments, subindex, false); // the last argument sets the 'is_root' parameter to false such that kmers are added to `parent_kmers`. However, this causes that no shuffling takes place reducing the efficiency a bit. This could be further optimized perhaps by adding an extra parameter.
+                insert_into_ibf(root_kmers, std::make_tuple(ibf_idx, split_idxs[split], 1), index, std::make_tuple(0,0));       // also fills the (new) MB.
+                //4) initialize additional datastructures for the subindex.
+                subindex.ibf().initialize_previous_ibf_id();
+                subindex.ibf().initialize_ibf_sizes();
+                //5) merge the index of the HIBF of the newly obtained subtree with the original index.
+                attach_subindex(index, subindex, std::make_tuple(ibf_idx, split_idxs[split]));
+            }
         }
     }
     // update datastructures
@@ -118,13 +143,14 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
  */
 std::vector<uint64_t> split_ibf(std::tuple<size_t,size_t> index_tuple, //rename to split_mb
                raptor_index<index_structure::hibf> & index,
+               update_arguments const & update_arguments,
                int number_of_splits)
 {
     std::vector<uint64_t> tb_idxs(number_of_splits);
     index.ibf().delete_tbs(std::get<0>(index_tuple), std::get<1>(index_tuple));    // Empty the merged bin.
 
     for (int split = 0; split < number_of_splits; split++){             // get indices of the empty bins on the higher level IBF to serve as new merged bins.
-            tb_idxs[split] = find_empty_bin_idx(index, std::get<0>(index_tuple));       // find an empty bin for a new MB on this IBF or resize. Import from insertions.
+            tb_idxs[split] = find_empty_bin_idx(index, std::get<0>(index_tuple), update_arguments);       // find an empty bin for a new MB on this IBF or resize. Import from insertions.
     }
     return tb_idxs;
 }
@@ -153,7 +179,7 @@ std::vector<std::vector<std::tuple<size_t, std::string>>> find_best_split( //ren
         && filename_idx < kmer_counts_filenames.size()){ // and while we did not reach the last file
             cumulative_sum += std::get<0>(kmer_counts_filenames[filename_idx]);
             filename_idx += 1;
-        } // TODO if one split consists of one filename, than it should be placed directly on the higher level.
+        }
         split_filenames.push_back(std::vector(        // create a new vector with filename indices.
             std::ranges::next(kmer_counts_filenames.begin(), split_idx, kmer_counts_filenames.end()),  // std::ranges::next(iterator, number, bound) is the same as iterator + number, but bound: it cannot go out of range.
             std::ranges::next(kmer_counts_filenames.begin(), filename_idx + 1, kmer_counts_filenames.end())));
@@ -229,16 +255,25 @@ chopper::configuration layout_config(raptor_index<index_structure::hibf> & index
                                      std::string file_indicator){
     std::filesystem::create_directories("tmp");
     chopper::configuration config{};
-    config.input_prefix = "tmp/temporary_layout" + file_indicator; // all temporary files ill be stored in the temporary folder. //input_prefix.get_path();
-    config.output_prefix = config.input_prefix;
-    config.output_filename = config.input_prefix + ".tsv";
+    //config.data_file = "tmp/temporary_layout" + file_indicator;
+    config.output_filename = "tmp/temporary_layout" + file_indicator + ".tsv";
     config.data_file = "tmp/subtree_bin_paths.txt"; // input of bins paths
-    chopper::detail::apply_prefix(config.output_prefix, config.count_filename, config.sketch_directory); // here the count filename and output_prefix are set.
     config.sketch_directory = update_arguments.sketch_directory;
-    config.rearrange_user_bins = update_arguments.similarity; // indicates whether updates should account for user bin's similarities.
+    config.disable_rearrangement = not update_arguments.similarity; // indicates whether updates should account for user bin's similarities. This also determines "estimate union"
+    config.disable_estimate_union = not update_arguments.similarity;
     config.update_ubs = update_arguments.empty_bin_percentage; // percentage of empty bins drawn from distributions //makes sure to use empty bins.
-    config.tmax = update_arguments.tmax;
+
+    index.ibf().update_tmax();
+    config.tmax = index.ibf().t_max;
+    config.determine_best_tmax = false;
+
     config.false_positive_rate = index.ibf().fpr_max;
+    config.k = index.ibf().k;
+    config.num_hash_functions = index.ibf().num_hash_functions;
+
+    config.sketch_bits = update_arguments.sketch_bits;
+    config.threads = update_arguments.threads;
+
     return config;
 }
 
@@ -248,15 +283,39 @@ chopper::configuration layout_config(raptor_index<index_structure::hibf> & index
 * \warning an extra enter/return at the start of the bin file will cause segmentation faults in chopper.
 * \author Myrthe Willemsen
 */
-void call_layout(chopper::configuration & layout_arguments){
-    int exit_code{};
-    try
-    {
-        exit_code |= chopper::layout::execute(layout_arguments);
-    }
-    catch (sharg::parser_error const & ext){    // GCOVR_EXCL_START
-        std::cerr << "[CHOPPER ERROR] " << ext.what() << '\n';
-    }
+void call_layout(std::vector<std::tuple<size_t, std::string>> kmer_counts_filenames,
+                 chopper::configuration & config){ // layout_arguments
+        int exit_code{};
+
+        chopper::layout::layout hibf_layout{};
+        std::vector<std::string> filenames;
+        std::vector<size_t> kmer_counts;
+        for (const auto &entry: kmer_counts_filenames) {
+            kmer_counts.push_back(std::get<0>(entry));
+            filenames.push_back(std::get<1>(entry));
+        }
+        std::vector<bool> empty_bins; // A bitvector indicating whether a bin is empty (1) or not (0).
+        std::vector<size_t> empty_bin_cum_sizes; // The cumulative k-mer count for the first empty bin until empty bin i
+        std::vector<chopper::sketch::hyperloglog> sketches{};
+
+        try {
+            chopper::sketch::toolbox::read_hll_files_into(config.sketch_directory, filenames, sketches);
+            chopper::layout::insert_empty_bins(empty_bins, empty_bin_cum_sizes,
+                              kmer_counts, sketches, filenames, config);
+
+            chopper::data_store store{.false_positive_rate = config.false_positive_rate,
+                    .hibf_layout = &hibf_layout,
+                    .kmer_counts = kmer_counts,
+                    .sketches = sketches,
+                    .empty_bins = empty_bins,
+                    .empty_bin_cum_sizes = empty_bin_cum_sizes};
+
+            exit_code |= chopper::layout::execute(config, filenames, store);
+        }
+        catch (sharg::parser_error const &ext) {    // GCOVR_EXCL_START
+            std::cerr << "[CHOPPER ERROR] " << ext.what() << '\n';
+        }
+
 }
 
 /*!\brief Creates a configuration object which is passed to hierarchical build function.
@@ -265,8 +324,8 @@ void call_layout(chopper::configuration & layout_arguments){
 */
 build_arguments build_config(std::string subtree_bin_paths, update_arguments const & update_arguments, chopper::configuration layout_arguments){
     build_arguments build_arguments{};
-    build_arguments.kmer_size = 20;
-    build_arguments.window_size = 23;
+    build_arguments.kmer_size = 20; index.ib(),
+    build_arguments.window_size = 23; // TODO
     build_arguments.fpr = layout_arguments.false_positive_rate; //index.false_positive_rate
     build_arguments.is_hibf = true;
     build_arguments.bin_file = layout_arguments.output_filename; //layout_file

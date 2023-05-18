@@ -33,6 +33,9 @@ struct update_arguments
     //!\brief The index is an HIBF
     bool is_hibf{false};
 
+    //!\brief The method to select the IBF when inserting new user bins: "find_ibf_idx_traverse_by_similarity"; "find_ibf_idx_ibf_size"; "find_ibf_idx_traverse_by_fpr";
+    std::string ibf_selection_method{"find_ibf_idx_traverse_by_fpr"};
+
     //!\brief The percentage of empty bins sampled during layout computation.
     double empty_bin_percentage{0.1};
 
@@ -41,6 +44,13 @@ struct update_arguments
 
     //!\brief Maximum number of technical bins per IBF. Needed for layouting.
     double tmax{64};
+    bool tmax_condition{true}; //Indicates if the tmax should also be a restriction on IBFs at lower levels
+
+    //!\brief The number of bits the HyperLogLog sketch should use to distribute the values into bins.
+    uint8_t sketch_bits{12};
+
+    //!\brief The number of threads to use to compute merged HLL sketches.
+    size_t threads{1u};
 
 
     // Following arguments are mutually exclusive and indicate what update operation should be performed

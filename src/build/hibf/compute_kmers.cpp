@@ -13,7 +13,7 @@
 
 namespace raptor::hibf
 {
-template <typename arguments_t> //Myrthe 14.10
+template <typename arguments_t>
 void compute_kmers(robin_hood::unordered_flat_set<size_t> & kmers,
                    arguments_t const & arguments,
                    std::vector<std::string> const & filenames)//std::basic_string<char>
@@ -27,7 +27,6 @@ void compute_kmers(robin_hood::unordered_flat_set<size_t> & kmers,
 
             while (infile.read(reinterpret_cast<char *>(&minimiser_value), sizeof(minimiser_value)))
                 kmers.insert(minimiser_value);
-                // track a kmer_count here, Myrthe 14.10
         }
     }
     else
@@ -43,7 +42,7 @@ void compute_kmers(robin_hood::unordered_flat_set<size_t> & kmers,
                     kmers.insert(hash);
     }
 }
-template <typename arguments_t> //Myrthe 14.10
+template <typename arguments_t>
 void compute_kmers(robin_hood::unordered_flat_set<size_t> & kmers,
                    arguments_t const & arguments,
                    chopper_pack_record const & record){

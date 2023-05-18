@@ -17,13 +17,11 @@
 
 namespace raptor
 {
-//void split_ibf(size_t ibf_idx,
-//                  raptor_index<index_structure::hibf> & index, update_arguments const & arguments);
 chopper::configuration layout_config(raptor_index<index_structure::hibf> & index,
                                       update_arguments const & arguments,
                                       std::string file_indicator="");
 
-void call_layout(chopper::configuration & arguments);
+void call_layout(std::vector<std::tuple<size_t, std::string>> kmer_count_filenames, chopper::configuration & arguments);
 
 std::vector<std::tuple<size_t, std::string>> get_kmer_counts(raptor_index<index_structure::hibf> const & index,
                                                              std::set<std::string> const & filenames);
@@ -33,6 +31,7 @@ void write_kmer_counts(std::vector<std::tuple<size_t, std::string>> kmer_counts_
 
 std::vector<uint64_t> split_ibf(std::tuple<size_t,size_t> index_tuple,
            raptor_index<index_structure::hibf> & index,
+           update_arguments const & update_arguments,
            int number_of_splits = 2);
 
 std::vector<std::vector<std::tuple<size_t, std::string>>> find_best_split(
@@ -68,5 +67,8 @@ void remove_ibfs(raptor_index<index_structure::hibf> & index,
 void attach_subindex(raptor_index<index_structure::hibf> & index,
                    raptor_index<index_structure::hibf> & subindex,
                    std::tuple<size_t, size_t> index_tuple);
+
+bool check_tmax_rebuild(raptor_index<index_structure::hibf> & index, size_t ibf_idx,
+                        update_arguments const & update_arguments);
 
 } // namespace raptor

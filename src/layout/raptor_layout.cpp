@@ -1,16 +1,25 @@
 // --------------------------------------------------------------------------------------------------
-// Copyright (c) 2006-2022, Knut Reinert & Freie Universität Berlin
-// Copyright (c) 2016-2022, Knut Reinert & MPI für molekulare Genetik
+// Copyright (c) 2006-2023, Knut Reinert & Freie Universität Berlin
+// Copyright (c) 2016-2023, Knut Reinert & MPI für molekulare Genetik
 // This file may be used, modified and/or redistributed under the terms of the 3-clause BSD-License
 // shipped with this file and also available at: https://github.com/seqan/raptor/blob/main/LICENSE.md
 // --------------------------------------------------------------------------------------------------
 
-#include <chopper/count/execute.hpp>
-#include <chopper/detail_apply_prefix.hpp>
+/*!\file
+ * \brief Implements raptor::chopper_layout.
+ * \author Enrico Seiler <enrico.seiler AT fu-berlin.de>
+ */
+
+#include <chopper/configuration.hpp>
+#include <chopper/data_store.hpp>
 #include <chopper/layout/execute.hpp>
 #include <chopper/set_up_parser.hpp>
+#include <chopper/sketch/estimate_kmer_counts.hpp>
+#include <chopper/sketch/execute.hpp>
 
+#include <raptor/argument_parsing/init_shared_meta.hpp>
 #include <raptor/layout/raptor_layout.hpp>
+#include <chopper/layout/insert_empty_bins.hpp>
 
 namespace raptor
 {
@@ -19,36 +28,35 @@ void chopper_layout(sharg::parser & parser)
 {
     chopper::configuration config;
     set_up_parser(parser, config);
+    init_shared_meta(parser);
+    parser.info.author = "Svenja Mehringer";
+    parser.info.email = "svenja.mehringer@fu-berlin.de";
 
-    try
-    {
-        parser.parse();
-    }
-    // GCOVR_EXCL_START
-    catch (sharg::parser_error const & ext) // the user did something wrong
-    {
-        std::cerr << "[CHOPPER ERROR] " << ext.what() << '\n'; // customize your error message
-        return;
-    }
-    // GCOVR_EXCL_STOP
+    parser.parse();
+    config.disable_sketch_output = !parser.is_option_set("output-sketches-to");
 
-    config.input_prefix = config.output_prefix;
+    chopper::layout::layout hibf_layout{};
+    std::vector<std::string> filenames{};
+    std::vector<size_t> kmer_counts{};
+    std::vector<chopper::sketch::hyperloglog> sketches{};
+    std::vector<bool> empty_bins; // A bitvector indicating whether a bin is empty (1) or not (0).
+    std::vector<size_t> empty_bin_cum_sizes; // The cumulative k-mer count for the first empty bin until empty bin i
+    chopper::layout::insert_empty_bins(empty_bins, empty_bin_cum_sizes,
+                      kmer_counts, sketches, filenames, config);
 
-    chopper::detail::apply_prefix(config.output_prefix, config.count_filename, config.sketch_directory);
+    chopper::sketch::read_data_file(config, filenames);
 
-    int exit_code{};
+    chopper::sketch::execute(config, filenames, sketches);
+    chopper::sketch::estimate_kmer_counts(sketches, kmer_counts);
 
-    try
-    {
-        exit_code |= chopper::count::execute(config);
-        exit_code |= chopper::layout::execute(config);
-    }
-    // GCOVR_EXCL_START
-    catch (sharg::parser_error const & ext)
-    {
-        std::cerr << "[CHOPPER ERROR] " << ext.what() << '\n';
-    }
-    // GCOVR_EXCL_STOP
+    chopper::data_store store{.false_positive_rate = config.false_positive_rate,
+                              .hibf_layout = &hibf_layout,
+                              .kmer_counts = kmer_counts,
+                              .sketches = sketches,
+                              .empty_bins = empty_bins,
+                              .empty_bin_cum_sizes = empty_bin_cum_sizes};
+
+    chopper::layout::execute(config, filenames, store);
 }
 
-} // namespace raptor
+}

@@ -15,38 +15,14 @@
 namespace raptor::hibf
 {
 
-// for merged bins
-// automatically does naive splitting if number_of_bins > 1
-//void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
-//                     robin_hood::unordered_flat_set<size_t> const & kmers,
-//                     size_t const number_of_bins,
-//                     size_t const bin_index, // Bin_index: xth bin in an IBF
-//                     seqan3::interleaved_bloom_filter<> & ibf,
-//                     bool is_root)
-//{
-//    size_t const chunk_size = kmers.size() / number_of_bins + 1;
-//    size_t chunk_number{};
-//
-//    for (auto chunk : kmers | seqan3::views::chunk(chunk_size))
-//    {
-//        assert(chunk_number < number_of_bins);
-//        seqan3::bin_index const bin_idx{bin_index + chunk_number};
-//        ++chunk_number;
-//        for (size_t const value : chunk)
-//        {
-//            ibf.emplace(value, bin_idx);
-//            if (!is_root)
-//                parent_kmers.insert(value);
-//        }
-//    }
-//
-//}
-/*!\brief Insertions of an UB into an IBF //TODO DOC
+/*!\brief Insertions of an UB into an IBF, used during ther hierarchical build
  * \details The algorithm inserts the k-mers of a UB in one or more TBs
  * \param[in] kmers the set of kmers to be stored
  * \param[in] index the original HIBF
  * \param[in] ibf_idx, bin_idx, number_of_bins A index triple of the index of IBF, start index of the technical bins, and the number of bins
- * \param[in] ibf a  reference to the IBF to insert the
+ * \param[in] ibf a  reference to the IBF to insert the k-mers into
+ * \param[in] parent_kmers the set of kmers of the parent merged bin of the current technical bin.
+ * \param[in] is_root indicates if we are at the highest-level IBF.
  * \author Myrthe Willemsen
  */
 
@@ -62,7 +38,6 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
     size_t const ibf_idx = std::get<0>(index_triple);
     size_t const start_bin_idx = std::get<1>(index_triple);
     size_t const number_of_bins = std::get<2>(index_triple);
-    //auto& ibf = index.ibf_vector[ibf_idx]; //  select the IBF , or data.hibf.ibf_vector[] or auto&&
     size_t const chunk_size = kmers.size() / number_of_bins + 1;
     size_t chunk_number{};
 
@@ -98,7 +73,7 @@ template void insert_into_ibf<seqan3::data_layout::compressed>(robin_hood::unord
                               seqan3::interleaved_bloom_filter<> & ,
                      bool);
 
-template <typename arguments_t> //Myrthe 14.10
+template <typename arguments_t>
 void insert_into_ibf(arguments_t const & arguments,
                      chopper_pack_record const & record,
                      seqan3::interleaved_bloom_filter<> & ibf) //  edge case when there is no splitting at the root and the function can be simplified (and is probably more efficient than the first, more generic one)

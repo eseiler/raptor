@@ -145,6 +145,12 @@ public:
     //!\brief Maximum number of bins of an IBF.
     double t_max;
 
+    //!\brief K-mer size.
+    double k{20};
+
+    //!\brief The number of hash functions for the IBFs.
+    size_t num_hash_functions{2};
+
     //!\brief Maximum (or optimal) number of k-mers (bin counts) that IBF could hold at that moment. The vector contains tuples of (ibf_size, ibf_idx), sorted by ibf size.
     std::vector<std::tuple<size_t, size_t>> ibf_sizes;
 
@@ -182,6 +188,13 @@ public:
             return true;
         }else{ return false;}
     }
+
+    void update_tmax(){
+        auto next_multiple_of_64 = [](size_t value) {return ((value + 63) >> 6) << 6;};   // Takes a number and calculates the next multiple of 64
+        size_t user_bin_count = user_bins.size();
+        size_t t_max = next_multiple_of_64(std::ceil(std::sqrt(user_bin_count)));
+    }
+
 
     /*!\brief Returns the number of bins a TB is split into
      * \param[in] ibf_idx
@@ -413,7 +426,7 @@ public:
      * The table of ibf_sizes is used for one of the UB insertion methods of the dynamic HIBF.
      * \author Myrthe Willemsen
      */
-    void initialize_ibf_sizes(bool max_size=true){     // TODO also check why the ibf_sizes do not display the kmer counts (?) Some occacions it just displayed (1,0).
+    void initialize_ibf_sizes(bool max_size=true){
         for (size_t ibf_idx=0; ibf_idx < ibf_vector.size(); ibf_idx++){
             ibf_sizes.push_back(std::make_tuple(ibf_max_kmers(ibf_idx), ibf_idx));
         }
@@ -530,9 +543,9 @@ public:
         for (size_t idx{}; idx < user_bin_filenames.size(); ++idx) // repopulate `filename_to_idx` by traversing over the `user_bin_filenames` vector
         {
             std::string filename = user_bin_filenames[idx];
-            filename_to_idx.emplace(filename, idx);
-        }
+            if (filename.find(".empty_bin") == -1) filename_to_idx.emplace(filename, idx); // if it is not an empty bin
 
+        }
         for (size_t ibf_idx{}; ibf_idx < ibf_bin_to_filename_position.size(); ++ibf_idx)
         {
             auto const & ibf_data = ibf_bin_to_filename_position[ibf_idx];
@@ -581,9 +594,10 @@ public:
         return true; // filename/user bin does already exist in HIBF
     }
 
-    /*!\brief update the filename datastructures with a new filename, e.g. when a new user bin has been added  TODO
-     * \param [in] filename
-     * \param [in] index_triple
+    /*!\brief update the filename datastructures with a new filename, e.g. when a new user bin has been added
+     * \details this function is used for insertions, to update all different user bin datastructure with the new filename.
+     * \param [in] filename the filename of the new user bin
+     * \param [in] index_triple the ibf_idx, bin_idx and number_of_bins.
      * \author Myrthe Willemsen
      */
     void update_filename_indices(std::string const & filename, std::tuple <uint64_t, uint64_t, uint16_t> & index_triple){
@@ -623,6 +637,12 @@ public:
     void set_user_bin_count(size_t const size)
     {
         user_bin_filenames.resize(size);
+    }
+
+    //!\brief Gets the user bin count.
+    size_t size()
+    {
+        return user_bin_filenames.size();
     }
 
     //!\brief Returns a vector containing user bin indices for each bin in the `idx`th IBF.
@@ -708,7 +728,7 @@ public:
  * \details
  * In contrast to the [seqan3::interleaved_bloom_filter][1], the result will consist of indices of user bins.
  */
-template <seqan3::data_layout data_layout_mode> // TODO: value_t as template?
+template <seqan3::data_layout data_layout_mode>
 class hierarchical_interleaved_bloom_filter<data_layout_mode>::membership_agent
 {
 private:
@@ -801,7 +821,7 @@ public:
 
         bulk_contains_impl(values, 0, threshold);
 
-        std::ranges::sort(result_buffer); // TODO: necessary?
+        std::ranges::sort(result_buffer);
 
         return result_buffer;
     }
