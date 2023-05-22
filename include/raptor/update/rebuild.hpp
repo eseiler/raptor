@@ -50,8 +50,7 @@ void full_rebuild(raptor_index<index_structure::hibf> & index,
 
 void write_filenames(std::string bin_path, std::set<std::string> user_bin_filenames);
 
-build_arguments build_config(std::string subtree_bin_paths,
-                             update_arguments const & update_arguments,
+build_arguments build_config(raptor_index<index_structure::hibf> & index,
                              chopper::configuration layout_arguments);
 
 template <seqan3::data_layout data_layout_mode>

@@ -28,7 +28,7 @@ namespace raptor
                     raptor_index<index_structure::hibf> & index);
     size_t find_ibf_idx_traverse_by_similarity(robin_hood::unordered_flat_set<size_t> & kmers,  raptor_index<index_structure::hibf> & index, size_t ibf_idx=0);
 //    [[nodiscard]] constexpr size_t next_multiple_of_64(size_t const value) noexcept;
-    std::tuple <uint64_t, uint64_t> insert_tb_and_parents(robin_hood::unordered_flat_set<size_t> & kmers, std::tuple <uint64_t, uint64_t, uint16_t> & index_triple,
+    std::tuple <uint64_t, uint64_t> insert_tb_and_parents(robin_hood::unordered_flat_set<size_t> & kmers, std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
                   raptor_index<index_structure::hibf> & index);
     size_t find_ibf_idx_traverse_by_fpr_tmax(size_t & kmer_count, raptor_index<index_structure::hibf> & index,
                                           update_arguments const & update_arguments,size_t ibf_idx);

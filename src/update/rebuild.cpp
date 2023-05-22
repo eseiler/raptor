@@ -38,7 +38,7 @@ void full_rebuild(raptor_index<index_structure::hibf> & index,
     call_layout(kmer_counts_filenames, layout_arguments);
     //3) call hierarchical build.
     raptor_index<index_structure::hibf> new_index{}; //create the empty HIBF of the subtree.
-    build_arguments build_arguments = build_config(layout_arguments.data_file, update_arguments, layout_arguments); // create the arguments to run the build algorithm with.
+    build_arguments build_arguments = build_config(index, layout_arguments); // create the arguments to run the build algorithm with.
     call_build(build_arguments, new_index, true);
     index = new_index;
     //4) initialize additional datastructures for the subindex.
@@ -80,7 +80,7 @@ bool check_tmax_rebuild(raptor_index<index_structure::hibf> & index, size_t ibf_
  */
 void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
                   raptor_index<index_structure::hibf> & index,
-                  update_arguments const & update_arguments, //TODO? add argument with filename + kmer count to be added.
+                  update_arguments const & update_arguments, //TODO later add argument with filename + kmer count to be added.
                   int number_of_splits) // instead of setting a default parameter here, add this to the update arguments
 {
     std::cout << "Partial rebuild" << std::flush;
@@ -116,7 +116,7 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
                 call_layout(kmer_counts_filenames, layout_arguments);
                 //3) call hierarchical build.
                 raptor_index<index_structure::hibf> subindex{}; //create the empty HIBF of the subtree.
-                build_arguments build_arguments = build_config(layout_arguments.data_file, update_arguments, layout_arguments); // create the arguments to run the build algorithm with.
+                build_arguments build_arguments = build_config(index, layout_arguments); // create the arguments to run the build algorithm with.
                 robin_hood::unordered_flat_set<size_t> root_kmers = call_build(build_arguments, subindex, false); // the last argument sets the 'is_root' parameter to false such that kmers are added to `parent_kmers`. However, this causes that no shuffling takes place reducing the efficiency a bit. This could be further optimized perhaps by adding an extra parameter.
                 insert_into_ibf(root_kmers, std::make_tuple(ibf_idx, split_idxs[split], 1), index, std::make_tuple(0,0));       // also fills the (new) MB.
                 //4) initialize additional datastructures for the subindex.
@@ -210,7 +210,8 @@ std::vector<std::tuple<size_t, std::string>> get_kmer_counts(raptor_index<index_
         }
     }
     std::ranges::sort(kmer_counts_filenames);
-    return kmer_counts_filenames; // array of tuples with filename and k-mer count, sorted by kmer count.
+    std::reverse(kmer_counts_filenames.begin(), kmer_counts_filenames.end());
+    return kmer_counts_filenames; // array of tuples with filename and k-mer count, sorted descending by kmer count.
 }
 
 /*!\brief Store kmer or minimizer counts for each specified file stored within the HIBF.
@@ -290,7 +291,7 @@ void call_layout(std::vector<std::tuple<size_t, std::string>> kmer_counts_filena
         chopper::layout::layout hibf_layout{};
         std::vector<std::string> filenames;
         std::vector<size_t> kmer_counts;
-        for (const auto &entry: kmer_counts_filenames) {
+        for (const auto &entry: kmer_counts_filenames) { // kmer_counts_filenames is sorted decending.
             kmer_counts.push_back(std::get<0>(entry));
             filenames.push_back(std::get<1>(entry));
         }
@@ -299,7 +300,7 @@ void call_layout(std::vector<std::tuple<size_t, std::string>> kmer_counts_filena
         std::vector<chopper::sketch::hyperloglog> sketches{};
 
         try {
-            chopper::sketch::toolbox::read_hll_files_into(config.sketch_directory, filenames, sketches);
+            chopper::sketch::toolbox::read_hll_files_into(config.sketch_directory, filenames, sketches); // TODO give a warning inf not all sketches are found.
             chopper::layout::insert_empty_bins(empty_bins, empty_bin_cum_sizes,
                               kmer_counts, sketches, filenames, config);
 
@@ -319,16 +320,16 @@ void call_layout(std::vector<std::tuple<size_t, std::string>> kmer_counts_filena
 }
 
 /*!\brief Creates a configuration object which is passed to hierarchical build function.
-* \param[in] subtree_bin_paths the file containing all paths to the user bins for which a layout should be computed
 * \author Myrthe Willemsen
 */
-build_arguments build_config(std::string subtree_bin_paths, update_arguments const & update_arguments, chopper::configuration layout_arguments){
+build_arguments build_config(raptor_index<index_structure::hibf> & index,
+                             chopper::configuration layout_arguments){
     build_arguments build_arguments{};
-    build_arguments.kmer_size = 20; index.ib(),
-    build_arguments.window_size = 23; // TODO
-    build_arguments.fpr = layout_arguments.false_positive_rate; //index.false_positive_rate
+    build_arguments.kmer_size = index.ibf().k;
+    build_arguments.window_size =  index.ibf().window_size;
+    build_arguments.fpr = index.ibf().fpr_max;
     build_arguments.is_hibf = true;
-    build_arguments.bin_file = layout_arguments.output_filename; //layout_file
+    build_arguments.bin_file = layout_arguments.output_filename;
     return build_arguments;
 }
 

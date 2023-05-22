@@ -28,22 +28,23 @@ namespace raptor
 std::tuple <uint64_t, uint64_t, uint16_t> get_location(size_t kmer_count, robin_hood::unordered_flat_set<size_t> &kmers,
                                                        raptor_index<index_structure::hibf> & index,
                                                        update_arguments const & update_arguments){
-    size_t root_idx = 0; size_t ibf_idx = 0;
+    size_t root_idx = 0; size_t ibf_idx=-1;
     if (update_arguments.ibf_selection_method == "find_ibf_idx_traverse_by_similarity")
-        size_t ibf_idx = find_ibf_idx_traverse_by_similarity(kmers, index);
+        ibf_idx = find_ibf_idx_traverse_by_similarity(kmers, index);
     else if (update_arguments.ibf_selection_method == "find_ibf_idx_ibf_size")
-        size_t ibf_idx = find_ibf_idx_ibf_size(kmers.size(), index);
+        ibf_idx = find_ibf_idx_ibf_size(kmers.size(), index);
     else if (update_arguments.ibf_selection_method == "find_ibf_idx_traverse_by_fpr"){
         size_t ibf_idx_by_size = find_ibf_idx_traverse_by_fpr(kmer_count, index, root_idx);
         if (update_arguments.tmax_condition){
-            size_t ibf_idx = find_ibf_idx_traverse_by_fpr_tmax(kmer_count, index, update_arguments, ibf_idx_by_size);
-            if (ibf_idx == -1) ibf_idx =  ibf_idx_by_size; // in fact, we should do here a partial rebuild, adding the new filename to the subtree. Currently a rebuild is triggered because we resize beyond tmax.  TODO
+            ibf_idx = find_ibf_idx_traverse_by_fpr_tmax(kmer_count, index, update_arguments, ibf_idx_by_size);
+            if (ibf_idx == -1)
+                ibf_idx =  ibf_idx_by_size; // in fact, we should do here a partial rebuild, adding the new filename to the subtree. Currently a rebuild is triggered because we resize beyond tmax.  TODO
         }
     }
     else
         std::cout << "No correct IBF selection method was entered";
     size_t number_of_bins = 1; // calculate number of user bins needed.
-    if (ibf_idx == 0 and index.ibf().ibf_max_kmers(ibf_idx) < (size_t) kmer_count){      // Only if we are at the root we might have to split bins. Delete ibf_idx==0, if using similarity method
+    if (index.ibf().ibf_max_kmers(ibf_idx) < (size_t) kmer_count){      // Only if we are at the root we might have to split bins. Delete ibf_idx==0, if using similarity method
         number_of_bins = index.ibf().number_of_bins(ibf_idx, (int) kmer_count);       // calculate among how many bins we should split
     }
     uint64_t bin_idx = find_empty_bin_idx(index, ibf_idx, update_arguments, number_of_bins);
@@ -77,14 +78,14 @@ void update_sketch(std::vector<std::string> filename, update_arguments update_ar
  * `insert_into_ibf` will be called. This function updates the `rebuild_index_tuple`, indicating
  * whether part of the index needs to be rebuild. This is initialized with the ibf_idx being the HIBF size.
  * \param[in] kmers the set of kmers to be stored
- * \param[in] index_triple (ibf_idx, bin_idx, number_of_bins) indicating where the UB needs to be inserted.
+ * \param[in] index_triple (ibf_idx, bin_idx, number_of_bins) indicating where the UB needs to be inserted. Not by reference, because the index_triple is modified.
  * \param[in] index the original HIBF
  * \return rebuild_index_tuple containing (ibf_idx, bin_idx). If the ibf_idx is lower than the total number of IBFs,
  * then the respective IBF needs to be rebuild.
  * \author Myrthe Willemsen
  */
 std::tuple <uint64_t, uint64_t> insert_tb_and_parents(robin_hood::unordered_flat_set<size_t> & kmers,
-                                                      std::tuple <uint64_t, uint64_t, uint16_t> & index_triple,
+                                                      std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
                                                       raptor_index<index_structure::hibf> & index){
     std::tuple <uint64_t, uint64_t> rebuild_index_tuple = std::make_tuple(index.ibf().ibf_vector.size(), 0);
     while (true){
@@ -150,7 +151,12 @@ void split_user_bin(std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
     index.ibf().delete_tbs(ibf_idx, start_bin_idx, number_of_bins);
     size_t new_number_of_bins = std::ceil((int) number_of_bins * update_arguments.empty_bin_percentage);  // new number of bins * empty_bin_percentage
     size_t new_start_bin_idx = find_empty_bin_idx(index, ibf_idx, update_arguments, new_number_of_bins); // Find empty bins.
-    // TODO: if new_start_bin_idx == ibf.size / t_max (?) then it is full! Do an additional resize.
+    size_t ibf_bin_count = index.ibf().ibf_vector[ibf_idx].bin_count();
+    if (new_start_bin_idx == ibf_bin_count){ // current solution TODO
+        size_t new_ibf_bin_count = new_bin_count(number_of_bins, update_arguments.empty_bin_percentage, ibf_bin_count);
+        std::cout << "Resize the IBF at index: " << ibf_idx << "\n" << std::flush;
+        index.ibf().resize_ibf(ibf_idx, new_ibf_bin_count);
+    }
     std::tuple <uint64_t, uint64_t, uint16_t> new_index_triple = std::make_tuple(ibf_idx, new_start_bin_idx, new_number_of_bins);
     raptor::hibf::compute_kmers(kmers, update_arguments, std::vector{filename}); // Get existing k-mers
     insert_into_ibf(kmers, new_index_triple, index, std::make_tuple((uint16_t) 0, (uint16_t) 0)); // Insert the k-mer content of the user bin again.
@@ -288,7 +294,8 @@ size_t find_ibf_idx_traverse_by_fpr(size_t & kmer_count, raptor_index<index_stru
     auto number_of_bins = index.ibf().number_of_bins(ibf_idx, (int) kmer_count);       // calculate among how many bins we should split
     size_t start_bin_idx = find_empty_bin_idx(index, ibf_idx, update_arguments, number_of_bins); // Find empty bins.
 
-    if (start_bin_idx =! ibf.bin_count()) return(ibf_idx); // if we do find empty bins, just return this IBF.
+    if (start_bin_idx != ibf.bin_count())
+        return(ibf_idx); // if we do find empty bins, just return this IBF.
     else if (start_bin_idx == ibf.bin_count()){ // If we can find no empty bins in the IBF, traverse down.
         size_t best_mb_idx = ibf.bin_count(); double best_fpr = 1; // initialize the best idx outside of the ibf, such that we can use this after the loop to check if a MB was found.
          for (size_t bin_idx=0; bin_idx < ibf.bin_count(); ++bin_idx){ //loop over bins to find the bext merged bin
@@ -304,7 +311,7 @@ size_t find_ibf_idx_traverse_by_fpr(size_t & kmer_count, raptor_index<index_stru
              return -1; //if no IBFs have been found in this subtree, then insert somewhere up the subtree, and rebuild? ; for now, insert in the original level, which triggers a rebuild itself. This can be improved by just inserting the sequence content in the merged bins up the tree, and then rebuilding without inserting the file beforehand.
          }else{
              auto next_ibf_idx = index.ibf().next_ibf_id[ibf_idx][best_mb_idx]; //enter the next IBF.
-             return (find_ibf_idx_traverse_by_fpr(kmer_count, index, next_ibf_idx));
+             return (find_ibf_idx_traverse_by_fpr_tmax(kmer_count, index, update_arguments, next_ibf_idx));
          }
     }
 }

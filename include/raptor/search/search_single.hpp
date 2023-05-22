@@ -45,7 +45,7 @@ void search_single(search_arguments const & arguments, index_t && index)
     {
         size_t position{};
         std::string line{};
-        for (auto const & file_list : arguments.bin_path)
+        for (auto const & file_list : arguments.bin_path) //TODO these are all the bins present in the HIBF right? either change this to ibf.user_bins or update bin_paths after an update operation.
         {
             line.clear();
             line = '#';

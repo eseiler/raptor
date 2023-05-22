@@ -19,8 +19,7 @@ namespace raptor
 */
 struct update_arguments
 {
-    uint32_t window_size{};
-    uint8_t kmer_size{};
+
     seqan3::shape shape{};
     uint8_t parts{1u};
     //!\brief The index is compressed

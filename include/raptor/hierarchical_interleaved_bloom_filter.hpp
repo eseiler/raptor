@@ -146,7 +146,15 @@ public:
     double t_max;
 
     //!\brief K-mer size.
-    double k{20};
+    uint8_t k{20};
+
+    //!\brief window size.
+    double window_size{23};
+
+    //!\brief minimizer shape
+    bool compute_minimiser{false};
+    seqan3::shape shape{seqan3::ungapped{k}};
+    std::string shape_string{};
 
     //!\brief The number of hash functions for the IBFs.
     size_t num_hash_functions{2};
@@ -189,10 +197,11 @@ public:
         }else{ return false;}
     }
 
+    //!\brief Updates the tmax based on the number of user bins.
     void update_tmax(){
         auto next_multiple_of_64 = [](size_t value) {return ((value + 63) >> 6) << 6;};   // Takes a number and calculates the next multiple of 64
         size_t user_bin_count = user_bins.size();
-        size_t t_max = next_multiple_of_64(std::ceil(std::sqrt(user_bin_count)));
+        t_max = next_multiple_of_64(std::ceil(std::sqrt(user_bin_count)));
     }
 
 
@@ -427,6 +436,7 @@ public:
      * \author Myrthe Willemsen
      */
     void initialize_ibf_sizes(bool max_size=true){
+        ibf_sizes.clear();
         for (size_t ibf_idx=0; ibf_idx < ibf_vector.size(); ibf_idx++){
             ibf_sizes.push_back(std::make_tuple(ibf_max_kmers(ibf_idx), ibf_idx));
         }

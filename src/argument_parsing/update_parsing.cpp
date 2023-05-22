@@ -32,18 +32,7 @@ void init_update_parser(sharg::parser & parser, update_arguments & arguments)
     parser.add_option(
         arguments.out_file,
         sharg::config{.short_id = '\0', .long_id = "output", .description = "Path to new index.", .required = true});
-    parser.add_option(arguments.window_size,
-                      sharg::config{.short_id = '\0',
-                                    .long_id = "window",
-                                    .description = "The original window size.",
-                                    .required = true,
-                                    .validator = positive_integer_validator{}});
-    parser.add_option(arguments.kmer_size,
-                      sharg::config{.short_id = '\0',
-                                    .long_id = "kmer",
-                                    .description = "The original kmer size.",
-                                    .required = true,
-                                    .validator = sharg::arithmetic_range_validator{1, 32}});
+
     parser.add_option(arguments.parts,
                       sharg::config{.short_id = '\0',
                                     .long_id = "parts",
@@ -109,10 +98,6 @@ void update_parsing(sharg::parser & parser)
     // ==========================================
     // Various checks.
     // ==========================================
-    if (arguments.kmer_size > arguments.window_size)
-        throw sharg::parser_error{"The k-mer size cannot be bigger than the window size."};
-
-    arguments.shape = seqan3::shape{seqan3::ungapped{arguments.kmer_size}};
 
     std::filesystem::path output_directory = arguments.out_file.parent_path();
     std::error_code ec{};
