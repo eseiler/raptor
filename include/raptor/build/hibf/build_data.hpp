@@ -52,20 +52,6 @@ struct build_data
         //hibf.ibf_sizes.resize(number_of_ibfs);
 
     }
-
-    void compute_fp_correction(size_t const tmax, size_t const hash, double const fpr)
-    {
-        fp_correction.resize(tmax + 1, 1.0);
-
-        double const denominator = std::log(1 - std::exp(std::log(fpr) / hash));
-
-        for (size_t i = 2; i <= tmax; ++i)
-        {
-            double const tmp = 1.0 - std::pow(1 - fpr, static_cast<double>(i));
-            fp_correction[i] = std::log(1 - std::exp(std::log(tmp) / hash)) / denominator;
-            assert(fp_correction[i] >= 1.0);
-        }
-    }
 };
 
 } // namespace raptor::hibf
