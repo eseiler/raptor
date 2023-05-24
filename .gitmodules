@@ -30,8 +30,8 @@
 	fetchRecurseSubmodules = false
 [submodule "lib/chopper"]
 	path = lib/chopper
-	url = https://github.com/MyrtheW/chopper/tree/myrthe.git #https://github.com/MyrtheW/chopper.git
-	branch = master
+	url = https://github.com/MyrtheW/chopper.git #https://github.com/MyrtheW/chopper.git
+	branch = myrthe2
 	shallow = true
 	fetchRecurseSubmodules = false
 [submodule "lib/simde"]
