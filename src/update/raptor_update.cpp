@@ -21,7 +21,7 @@ namespace raptor
  * \param[in] ibf_idx the index of the IBF where the subtree needs to be removed, including the ibf_idx itself.
  * \author Myrthe Willemsen
  */
-void raptor_update(update_arguments const & arguments)
+void raptor_update(update_arguments & arguments)
 {   if (arguments.is_hibf) // and not arguments.compressed remove arguments.compressed later, when decompressing is effective.
     {
         auto index = raptor_index<index_structure::hibf>{}; // Does not do anything with arguments? Strangely seems only done in store_index.

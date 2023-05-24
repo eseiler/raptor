@@ -153,7 +153,6 @@ public:
 
     //!\brief minimizer shape
     bool compute_minimiser{false};
-    seqan3::shape shape{seqan3::ungapped{k}};
     std::string shape_string{};
 
     //!\brief The number of hash functions for the IBFs.

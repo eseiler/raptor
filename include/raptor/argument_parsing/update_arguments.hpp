@@ -19,8 +19,12 @@ namespace raptor
 */
 struct update_arguments
 {
+    // needed for k-mer loading
+    seqan3::shape shape{seqan3::ungapped{20}};
+    uint32_t window_size{23};
 
-    seqan3::shape shape{};
+
+
     uint8_t parts{1u};
     //!\brief The index is compressed
     bool compressed{false};

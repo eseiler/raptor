@@ -49,7 +49,7 @@ void compute_kmers(robin_hood::unordered_flat_set<size_t> & kmers,
     compute_kmers(kmers, arguments, record.filenames);
 }
 
-template void compute_kmers<build_arguments>(robin_hood::unordered_flat_set<size_t> & kmers, //Myrthe 14.10
+template void compute_kmers<build_arguments>(robin_hood::unordered_flat_set<size_t> & kmers,
                    build_arguments const & arguments,
                    chopper_pack_record const & record);
 template void compute_kmers<update_arguments>(robin_hood::unordered_flat_set<size_t> & kmers,

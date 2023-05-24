@@ -12,6 +12,6 @@
 namespace raptor
 {
 
-void raptor_update(update_arguments const & arguments);
+void raptor_update(update_arguments & arguments);
 
 } // namespace raptor

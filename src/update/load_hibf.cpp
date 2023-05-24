@@ -15,7 +15,7 @@ namespace raptor
  * \param[in] update_arguments configuration object with parameters required for calling an update operation
  * \author Myrthe Willemsen
  */
-void load_hibf(raptor_index<index_structure::hibf> & index, update_arguments const & arguments) // perhaps better to have index as in and output of this function, because now it is calling the update function within.
+void load_hibf(raptor_index<index_structure::hibf> & index, update_arguments & arguments) // perhaps better to have index as in and output of this function, because now it is calling the update function within.
 {   if (not arguments.compressed){
     double index_io_time{0.0};
     load_index(index, arguments, index_io_time); // add: arguments.parts - 1, if HIBF consists of multiple
@@ -29,6 +29,9 @@ void load_hibf(raptor_index<index_structure::hibf> & index, update_arguments con
         auto some_compressed_ibf = index.ibf().ibf_vector[0];
         seqan3::interleaved_bloom_filter<seqan3::data_layout::compressed> ibf_uncompressed{some_compressed_ibf};
     }
+    arguments.shape =     seqan3::shape(seqan3::ungapped{20}); //index.ibf().shape; I can not use this, because, "shape in namespace seqan does not name a type"
+    arguments.window_size = index.ibf().window_size;
+
     return;
 }
 

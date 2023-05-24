@@ -13,5 +13,5 @@
 
 namespace raptor
 {
-void load_hibf(raptor_index<index_structure::hibf> & index, update_arguments const & arguments);
+void load_hibf(raptor_index<index_structure::hibf> & index, update_arguments &arguments);
 } // namespace raptor
