@@ -36,9 +36,9 @@ void chopper_build(build_arguments const & arguments)
     index.ibf().fpr_max = arguments.fpr; // This parameter is added here as member to the HIBF datastructure, such that they will be stored and can be used during search or updating. Note: `window_size`, `compressed`, `parts`,  `bin_path` and `shape` stored as part of the `index` datastructure. `kmer_size` could be obtained from `shape`,
     index.ibf().k = arguments.kmer_size;
     index.ibf().window_size = arguments.window_size;
-    index.ibf().shape = arguments.shape;
+    //index.ibf().shape = arguments.shape;
     index.ibf().shape_string = arguments.shape_string;
-    index_ibf().compute_minimiser = arguments.compute_minimiser;
+    index.ibf().compute_minimiser = arguments.compute_minimiser;
 
     store_index(arguments.out_path, index, arguments);
 }

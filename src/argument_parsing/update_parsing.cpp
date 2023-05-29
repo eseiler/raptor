@@ -87,6 +87,12 @@ void init_update_parser(sharg::parser & parser, update_arguments & arguments)
                                     .description = "User bin file appendix when inserting sequences in existing UBs",
                                     .advanced = true});
 
+     parser.add_option(arguments.ibf_selection_method,
+                  sharg::config{.short_id = '\0',
+                                .long_id = "insertion-method",
+                                .description = "The method to select the IBF when inserting new user bins: \"find_ibf_idx_traverse_by_similarity\"; \"find_ibf_idx_ibf_size\"; \"find_ibf_idx_traverse_by_fpr\";",
+                                .advanced = true});
+
 }
 
 void update_parsing(sharg::parser & parser)

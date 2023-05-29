@@ -46,6 +46,7 @@ void full_rebuild(raptor_index<index_structure::hibf> & index,
     index.ibf().initialize_previous_ibf_id();
     index.ibf().initialize_ibf_sizes();
     std::filesystem::remove_all("tmp");
+    std::filesystem::create_directory("tmp");
 }
 
 bool check_tmax_rebuild(raptor_index<index_structure::hibf> & index, size_t ibf_idx,
@@ -132,6 +133,7 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
     index.ibf().user_bins.initialize_filename_position_to_ibf_bin(); // this also updates the filename_to_idx datastructure
     // remove temporary files
     std::filesystem::remove_all("tmp");
+    std::filesystem::create_directory("tmp");
 }
 
 /*!\brief
@@ -254,10 +256,11 @@ void write_filenames(std::string bin_path, std::set<std::string> user_bin_filena
 chopper::configuration layout_config(raptor_index<index_structure::hibf> & index,
                                      update_arguments const & update_arguments,
                                      std::string file_indicator){
-    std::filesystem::create_directories("tmp");
+    std::filesystem::remove_all("tmp");
+    std::filesystem::create_directory("tmp");
     chopper::configuration config{};
     //config.data_file = "tmp/temporary_layout" + file_indicator;
-    config.output_filename = "tmp/temporary_layout" + file_indicator + ".tsv";
+    config.output_filename = "/tmp/temporary_layout" + file_indicator + ".txt";
     config.data_file = "tmp/subtree_bin_paths.txt"; // input of bins paths
     config.sketch_directory = update_arguments.sketch_directory;
     config.disable_rearrangement = not update_arguments.similarity; // indicates whether updates should account for user bin's similarities. This also determines "estimate union"
