@@ -44,7 +44,8 @@ std::tuple <uint64_t, uint64_t, uint16_t> get_location(size_t kmer_count, robin_
     else
         std::cout << "No correct IBF selection method was entered";
     size_t number_of_bins = 1; // calculate number of user bins needed.
-    if (index.ibf().ibf_max_kmers(ibf_idx) < (size_t) kmer_count){      // Only if we are at the root we might have to split bins. Delete ibf_idx==0, if using similarity method
+    if (index.ibf().ibf_max_kmers(ibf_idx) < (size_t) kmer_count){ // when using the find_ibf_idx_ibf_size, it segfaults in the bin_size function, when size_t bin_size = ibf.bin_size() in ibf_max_kmers
+        // Only if we are at the root we might have to split bins. Delete ibf_idx==0, if using similarity method
         number_of_bins = index.ibf().number_of_bins(ibf_idx, (int) kmer_count);       // calculate among how many bins we should split
     }
     uint64_t bin_idx = find_empty_bin_idx(index, ibf_idx, update_arguments, number_of_bins);
@@ -367,6 +368,7 @@ size_t find_ibf_idx_ibf_size(size_t kmer_count, raptor_index<index_structure::hi
         int high = array.size()-1;
         while (low <= high) {
             int mid = (low + high) >> 1;
+            assert(mid < array.size());
             if (std::get<0>(array[mid]) < kmer_count)
                 {low = mid + 1;}
             else if (std::get<0>(array[mid]) > kmer_count)
@@ -374,7 +376,9 @@ size_t find_ibf_idx_ibf_size(size_t kmer_count, raptor_index<index_structure::hi
             else if (std::get<0>(array[mid]) == kmer_count)
                 {return std::get<1>(array[mid]);} // exact kmer_count found
         }
-        return std::get<1>(array[low]);
+        low = std::min(low, static_cast<int>(array.size())-1); // low = mid + 1, so it may happen that low equals the array.size.
+        assert(low < array.size());
+        return std::get<1>(array[low]); // tODO head buffer overflow
     }
 
 

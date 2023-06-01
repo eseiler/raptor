@@ -84,6 +84,13 @@ void init_build_parser(sharg::parser & parser, build_arguments & arguments)
                                     .advanced = true,
                                     .validator = sharg::arithmetic_range_validator{0.0, 1.0}});
 
+    parser.add_flag(arguments.update_seqs,
+                sharg::config{
+                    .short_id = '\0',
+                    .long_id = "update-sequences",
+                    .description = "The percentage of extra space that should be allocated to each user bin, to support future sequence insertions",
+                });
+
     parser.add_flag(
         arguments.compressed,
         sharg::config{.short_id = '\0', .long_id = "compressed", .description = "Build a compressed index."});

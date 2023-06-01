@@ -1,70 +1,78 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib as mpl
+import importlib
+import matplotlib.patches as patches
 
+
+COLORL_grey = "#F0F0F0"
+COLORL_g = "#B2D3C5"
+COLORL_b = "#B2ECFF"
+COLORL_r = "#F8BBC4"
+COLORL_y = "#FFFCB2"
 COLOR_grey = "#F0F0F0"
-COLOR_g = "#B2D3C5"
-COLOR_b = "#B2ECFF"
-COLOR_r = "#F8BBC4"
+COLOR_g = "#5EA285"
+COLOR_b = "#3D9BCF"#"#13C7FF"
+COLOR_r = "#CE545D"#E8223E"
 COLOR_y = "#FFFCB2"
+dir = "/mnt/c/Users/myrth/Desktop/coding/raptor/build/bin/evaluation/"
 
 # Adjust line and tick mark sizes
 mpl.rcParams['lines.linewidth'] = 0.8
 mpl.rcParams['lines.markersize'] = 3.0
+myarrow = patches.ArrowStyle("Fancy",  head_length=0.05,head_width=0.05)
 
-
-# Data
-time_insertion = [3.830000, 11.760000, 2.690000, 2.420000, 2.780000, 2.490000, 2.380000, 2.330000, 2.410000, 2.510000, 2.450000, 2.880000, 3.540000, 5.270000, 2.890000, 3.030000, 2.980000, 3.850000, 3.020000, 2.620000, 2.280000, 2.090000, 2.060000, 2.110000, 2.100000, 2.330000, 2.030000, 2.140000, 2.330000, 2.360000, 2.170000, 2.030000, 5.170000, 5.200000, 0.170000, 5.140000, 5.690000, 0.170000, 0.160000, 0.150000, 0.140000, 0.200000, 0.150000, 0.150000, 0.190000, 0.210000, 0.170000, 0.140000, 0.150000, 0.180000, 0.170000, 0.160000, 0.180000, 0.160000, 0.220000, 0.170000, 0.180000, 0.210000, 0.230000, 0.290000, 0.170000, 0.200000, 0.520000, 0.160000, 0.180000, 0.200000, 0.190000, 0.190000, 0.310000, 5.500000, 6.970000, 0.240000, 5.100000, 5.180000, 0.180000, 0.240000, 0.270000, 0.140000, 0.160000, 0.180000, 0.160000, 0.230000, 0.230000, 0.180000, 0.170000, 0.150000, 0.170000, 0.160000, 0.140000, 0.170000, 0.160000, 0.160000, 0.150000, 0.140000, 0.170000, 0.150000, 0.150000, 0.170000, 0.170000, 0.140000, 0.190000, 0.220000, 0.200000, 0.150000, 0.140000, 0.170000, 7.900000, 7.420000, 0.420000, 9.460000, 6.370000, ]
-time_query = [0.000323, 0.000313, 0.000303, 0.000294, 0.000286, 0.000278, 0.000270, 0.000263, 0.000256, 0.000250, 0.000244, 0.000238, 0.000233, 0.000227, 0.000222, 0.000217, 0.000213, 0.000208, 0.000204, 0.000200, 0.000196, 0.000192, 0.000189, 0.000185, 0.000182, 0.000179, 0.000175, 0.000517, 0.000169, 0.000167, 0.000164, 0.000161, 0.000159, 0.000156, 0.000154, 0.000152, 0.000149, 0.000147, 0.000145, 0.000143, 0.000141, 0.000139, 0.000137, 0.000135, 0.000133, 0.000132, 0.000130, 0.000128, 0.000127, 0.000125, 0.000247, 0.000122, 0.000120, 0.000238, 0.000118, 0.000116, 0.000115, 0.000227, 0.000112, 0.000111, 0.000220, 0.000217, 0.000538, 0.000106, 0.000211, 0.000208, 0.000206, 0.000204, 0.000303, 0.000200, 0.000198, 0.000196, 0.000194, 0.000192, 0.000190, 0.000189, 0.000280, 0.000185, 0.000183, 0.000182, 0.000180, 0.000179, 0.000177, 0.000175, 0.000174, 0.000172, 0.000171, 0.000169, 0.000168, 0.000167, 0.000165, 0.000164, 0.000163, 0.000161, 0.000160, 0.000159, 0.000157, 0.000156, 0.000155, 0.000154, 0.000153, 0.000152, 0.000150, 0.000224, 0.000148, 0.000147, 0.000146, 0.000217, 0.000216, 0.000286, 0.000284, 0.000141, ]
-memory_insertion = [22324.000000, 48324.000000, 23588.000000, 23912.000000, 23316.000000, 23904.000000, 22140.000000, 22528.000000, 23512.000000, 23820.000000, 23932.000000, 23504.000000, 23168.000000, 22596.000000, 22492.000000, 23160.000000, 22228.000000, 22120.000000, 23772.000000, 23608.000000, 23144.000000, 22824.000000, 23404.000000, 22500.000000, 22844.000000, 23260.000000, 22408.000000, 23596.000000, 22832.000000, 22408.000000, 23040.000000, 23620.000000, 27764.000000, 27036.000000, 11328.000000, 27916.000000, 26644.000000, 11304.000000, 11292.000000, 11188.000000, 11276.000000, 11308.000000, 11296.000000, 11408.000000, 11320.000000, 11320.000000, 11324.000000, 11264.000000, 11440.000000, 11480.000000, 11200.000000, 11208.000000, 11332.000000, 11236.000000, 11416.000000, 11468.000000, 11304.000000, 11328.000000, 11344.000000, 11260.000000, 11372.000000, 11372.000000, 11508.000000, 11396.000000, 11340.000000, 11296.000000, 11472.000000, 11352.000000, 11476.000000, 26380.000000, 27044.000000, 11488.000000, 27128.000000, 26940.000000, 11468.000000, 11336.000000, 11328.000000, 11384.000000, 11176.000000, 11492.000000, 11480.000000, 11248.000000, 11432.000000, 11300.000000, 11404.000000, 11364.000000, 11336.000000, 11484.000000, 11520.000000, 11436.000000, 11308.000000, 11352.000000, 11432.000000, 11276.000000, 11216.000000, 11424.000000, 11220.000000, 11252.000000, 11388.000000, 11376.000000, 11492.000000, 11412.000000, 11340.000000, 11348.000000, 11204.000000, 11364.000000, 27128.000000, 26584.000000, 11308.000000, 28292.000000, 26504.000000, ]
-memory_query = [13400.000000, 13084.000000, 13400.000000, 13240.000000, 13224.000000, 13232.000000, 13436.000000, 13288.000000, 13428.000000, 13256.000000, 13408.000000, 13260.000000, 13476.000000, 13304.000000, 13252.000000, 13464.000000, 13172.000000, 13252.000000, 13020.000000, 13136.000000, 13472.000000, 13424.000000, 13288.000000, 13284.000000, 13476.000000, 13256.000000, 13308.000000, 13376.000000, 13476.000000, 13540.000000, 13260.000000, 13376.000000, 13236.000000, 13176.000000, 13208.000000, 13484.000000, 13252.000000, 13080.000000, 13172.000000, 13444.000000, 13308.000000, 13280.000000, 13112.000000, 13260.000000, 13104.000000, 13488.000000, 13284.000000, 13476.000000, 13156.000000, 13368.000000, 13244.000000, 13436.000000, 13168.000000, 13388.000000, 13216.000000, 13428.000000, 13264.000000, 13212.000000, 13292.000000, 13096.000000, 13240.000000, 13312.000000, 13408.000000, 13444.000000, 13184.000000, 13408.000000, 13368.000000, 13408.000000, 13236.000000, 13104.000000, 13076.000000, 13232.000000, 13172.000000, 13096.000000, 13100.000000, 13176.000000, 13152.000000, 13328.000000, 13144.000000, 13532.000000, 13412.000000, 13420.000000, 13192.000000, 13176.000000, 13260.000000, 13424.000000, 13416.000000, 13288.000000, 13268.000000, 13064.000000, 13324.000000, 13428.000000, 13448.000000, 13076.000000, 13432.000000, 13020.000000, 13152.000000, 13352.000000, 13372.000000, 13216.000000, 13212.000000, 13376.000000, 13356.000000, 13168.000000, 13424.000000, 13216.000000, 13224.000000, 13540.000000, 13252.000000, 13404.000000, 13476.000000, 13240.000000, ]
-size_index = [4284203, 4284311, 4284403, 4284495, 4284587, 4284679, 4284771, 4284863, 4284955, 4285047, 4285139, 4285231, 4285323, 4285415, 4285507, 4285599, 4285691, 4285783, 4285875, 4285967, 4286059, 4286151, 4286243, 4286335, 4286427, 4286519, 4286611, 4286703, 4286795, 4286887, 4286979, 4287071, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, 4287163, ]
-label_rebuilds = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, ]
-
-
-# Shifted x-values for the second and third plots
-x = np.arange(len(time_query))
 
 # Figure and axes
 fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True)
 
 # First plot: Insertions
-ax1.plot(x[:-1] + 0.5, time_insertion, color='black', marker='o', linestyle='-', label='Time')
 ax1.set_ylabel('Time (s)', color='black')
 ax1.tick_params(axis='y', colors='black')
 
 ax1_twin = ax1.twinx()
-ax1_twin.plot(x[:-1] + 0.5,  memory_insertion, color='black', marker='o', linestyle='--', label='Memory')
-ax1_twin.set_ylabel('Memory (kB)', color='black')
+ax1_twin.set_ylabel('Memory (MB)', color='black')
 ax1_twin.tick_params(axis='y', colors='black')
 
 # Second plot: Queries
-ax2.plot(x, time_query, color='black', marker='o', linestyle='-', label='Time')
 ax2.set_ylabel('Time (s)', color='black')
 ax2.tick_params(axis='y', colors='black')
-
 ax2_twin = ax2.twinx()
-ax2_twin.plot(x, memory_query, color='black', marker='o', linestyle='--', label='Memory')
-ax2_twin.set_ylabel('Memory (kB)', color='black')
+ax2_twin.set_ylabel('Memory (MB)', color='black')
 ax2_twin.tick_params(axis='y', colors='black')
 
 # Third plot: Index size
 ax3_twin = ax3.twinx()
-ax3_twin.plot(x, size_index, color='black', marker='o', linestyle='--', label='Size')
-ax3_twin.set_ylabel('Memory (kB)')
+ax3_twin.set_ylabel('Memory (MB)')
 ax3_twin.set_xlabel('UB insertions')
 
 # plotting data
+for method, colour in {"naive":'black', "find_ibf_idx_traverse_by_similarity": COLOR_b, "find_ibf_idx_ibf_size": COLOR_g, "find_ibf_idx_traverse_by_fpr": COLOR_r}.items() :
+    mod = importlib.import_module(  method )
+
+    x = np.arange(len(mod.time_query))
+    ax1.plot(x[:-1] + 0.5, mod.time_insertion, color=colour, marker='o', linestyle='-', label='Time; ' + method) # Shifted x-values for the second and third plots
+    #ax1_twin.plot(x[:-1] + 0.5,  [t/1000000 for t in mod.memory_insertion], color='None', markeredgecolor=colour, marker='o', linestyle='--', label='Memory ' + method)
+    ax2.plot(x, mod.time_query, color=colour, marker='o', linestyle='-', label='Time')
+    ax2_twin.plot(x, [t/1000000 for t in mod.memory_query], color='None', markeredgecolor=colour, marker='o', linestyle='--', label='Memory')
+    ax3_twin.plot(x, [t/1000000 for t in mod.size_index], color='None', markeredgecolor=colour, marker='o', linestyle='--', label='Size')
 
 
-# Annotate a point with partial rebuild
-for i in range(len(label_rebuilds)):
-    if label_rebuilds[i] == 1:
-        ax1.annotate('partial rebuild', xy=(i + 0.5, time_insertion[i]), xytext=(0, 20), textcoords='offset points', ha='center',
-                     arrowprops=dict(arrowstyle='-'))
-ax3_twin.annotate('partial rebuild', xy=(label_rebuilds[0] + 0.5, size_index[label_rebuilds[0]]), xytext=(0, 20), textcoords='offset points', ha='center',
-                  arrowprops=dict(arrowstyle='-')#, connectionstyle='arc3,rad=0.5')
-                  )
+    # Annotate a point with partial rebuild
+    if method == "find_ibf_idx_traverse_by_fpr":
+        first_label = False
+        for i in range(len(mod.rebuild)):
+            if mod.rebuild[i] == 1:
+                if first_label == False:
+                    ax1.annotate('partial rebuild', xy=(i + 0.5, mod.time_insertion[i]), xytext=(0, 20), textcoords='offset points', ha='center',
+                                 arrowprops=dict(arrowstyle='->'))
+                    first_label = True
+                else:
+                    ax1.annotate('', xy=(i + 0.5, mod.time_insertion[i]), xytext=(0, 20), textcoords='offset points', ha='center',
+                                 arrowprops=dict(arrowstyle='->'))
+    # ax3_twin.annotate('partial rebuild', xy=(label_rebuilds[0] + 0.5, size_index[label_rebuilds[0]]), xytext=(0, 20), textcoords='offset points', ha='center',
+    #                   arrowprops=dict(arrowstyle='-')#, connectionstyle='arc3,rad=0.5')
+    #                   )
 
 # Set subplot and y-labels.
 #ax1.annotate(' ', xy=(-5, 20000), xytext=(-5,20000),arrowprops=dict(arrowstyle='-', ls="--"), va='center', rotation=90,  annotation_clip=False)
@@ -82,19 +90,20 @@ ax3.set_xticklabels([])
 ax1.tick_params(axis='x', bottom=False)  # Hide x-axis tick labels
 ax2.tick_params(axis='x', bottom=False)  # Hide x-axis tick labels
 ax3.tick_params(axis='x', bottom=False)  # Hide x-axis tick labels
-ax1.set_ylim(0, max(time_insertion)*1.5)
-ax1.set_xlim(0, len(time_insertion)+1)
+#ax1.set_ylim(0, max(time_insertion)*1.5)
+ax1.set_xlim(0, len(mod.time_insertion))
 ax2.set_ylim(0)
 
 ax3.set_yticklabels([])
+
+# legend
+ax1.legend(edgecolor="white", bbox_to_anchor=(0.2, 1), loc='upper left',)
 
 # Adjust layout
 plt.tight_layout()
 
 # Display the plots
+plt.show("results/mixed_bins.pdf")
 plt.show()
 
-# figure caption
-# Perforamnce on a series of insertions . Memory usage -> max resident set size, in kB Memory
 
- # TODO also display the othe/group/ag_abi/software/bin/r method in the figure.

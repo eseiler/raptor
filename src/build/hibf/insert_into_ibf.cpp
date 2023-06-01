@@ -117,6 +117,8 @@ template void insert_into_ibf<upgrade_arguments>(upgrade_arguments const & argum
 
 } // namespace raptor::hibf
 
+
+
 namespace raptor{
 
 
@@ -128,7 +130,7 @@ namespace raptor{
  * \param[out] rebuild_index_tuple A tuple of the index of IBF and TB that need to be rebuild.
  * If the current TB reaches the FPR_max, it will be equal to the input value (when using the layout-rebuild method)
  * \attention This function is only available for **uncompressed** Interleaved Bloom Filters.
- * \author Myrthe Willemsen
+ * \author Myrthe Willemsen.
  */
 void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // kmers or minimizers
                     std::tuple <uint64_t, uint64_t, uint16_t> index_triple,

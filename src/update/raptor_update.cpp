@@ -42,8 +42,9 @@ void raptor_update(update_arguments & arguments)
             }
 
         }
-    // if arguments.compressed, it should be compressed again
-    store_index(arguments.out_file, index, arguments);
+        // if arguments.compressed, it should be compressed again
+        store_index(arguments.out_file, index, arguments);
+        std::cout << "[SUCCESS] successfully updated and stored the index"<<std::endl;
     }
     return;
 }

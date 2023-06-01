@@ -7,6 +7,7 @@
 #include <random>
 #include <regex>
 #include <cassert>
+#include <filesystem>
 
 //struct timespec start, end;
 //clock_gettime(CLOCK_MONOTONIC, &start); // 1.2 timer
@@ -192,12 +193,71 @@ void write_to_fasta(std::string filename_queries, std::string filename, double s
 }
 
 
+
+bool isLastLineEmpty(const std::string& filename) {
+    std::ofstream fileOut(filename);
+    fileOut << std::endl;
+    fileOut.close();
+
+    std::ifstream file(filename);
+
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file: " << filename << std::endl;
+        return false;
+    }
+
+    std::string lastLine;
+    std::string line;
+
+    while (std::getline(file, line)) {
+        if (!line.empty() && !std::all_of(line.begin(), line.end(), [](unsigned char c) { return std::isspace(c); })) {
+            lastLine = line;
+        }
+    }
+
+    file.close();
+
+    return lastLine.empty();
+}
+
+void deleteLastLine(const std::string& filename) {
+    std::ifstream fileIn(filename);
+    if (!fileIn.is_open()) {
+        std::cerr << "Failed to open file: " << filename << std::endl;
+        return;
+    }
+
+    std::string fileContent;
+    std::string line;
+
+    while (std::getline(fileIn, line)) {
+        fileContent += line + '\n';
+    }
+
+    fileIn.close();
+
+    std::ofstream fileOut(filename);
+    if (!fileOut.is_open()) {
+        std::cerr << "Failed to open file: " << filename << std::endl;
+        return;
+    }
+
+    if (!fileContent.empty()) {
+        fileContent.pop_back(); // Remove the last newline character
+        fileOut << fileContent;
+    }
+
+    fileOut.close();
+}
+
 void write_to_txt(std::string existing_filenames, std::string user_bin_filename){
     std::ofstream dest_file(existing_filenames, std::ios_base::app);
 
     if ( !dest_file.is_open())  std::cout << std::endl << "Failed to open the file! " + existing_filenames;
+
+
     std::string line;
-    dest_file << user_bin_filename << std::endl;    // write filename
+    dest_file << user_bin_filename << std::endl ;    // write filename TODO it is very important that there are no empty lines, this will cause an error in the layout method.
     dest_file.close();
 }
 
@@ -258,9 +318,12 @@ std::tuple<int, double, bool>  insert_ub(std::string filename_ub, std::string fi
     std::string ouptut_file = folder + "evaluation/" + "insertion_output.txt";
     auto memory_time = execute_command(ouptut_file, command);
     if (find_rebuild(ouptut_file, "rror")){
-                std::cout << "error message!" <<std::flush;
-                int n;
-                std::cin >>n;//std::exit();
+                std::cout << "[ERROR] error message detected!" <<std::flush;
+                std::cin.clear(); std::cin.get(); int n; std::cin >> n;//std::exit(); // TODO input is not always prompted.
+    }
+    if (not find_rebuild(ouptut_file, "[SUCCESS]")){
+        std::cout << "[ERROR] error message detected!" <<std::flush;
+        std::cin.clear(); std::cin.get(); int n; std::cin >> n;//std::exit();
     }
     return std::make_tuple(std::get<0>(memory_time), std::get<1>(memory_time), find_rebuild(ouptut_file, "Svenja+Myrthe"));
 }
@@ -271,29 +334,30 @@ std::tuple<int, double, bool>  rebuild_index(std::string filename_ub, std::strin
                                          std::string folder, std::string existing_filenames_building){
     system(("rm " + filename_index).c_str());
     std::string layout_file = folder + "evaluation/tmp/temporary_layout.txt";
-    std::string filename_executable_chopper = "/mnt/c/Users/myrth/Desktop/coding/raptor/lib/chopper/build/bin/chopper";//folder +  "chopper"; /
+    std::string filename_executable_chopper = folder + "chopper"; //"/mnt/c/Users/myrth/Desktop/coding/raptor/lib/chopper/build/bin/chopper";//folder +  "chopper"; /
     std::string command_build = filename_executable + " build --fpr 0.05 --kmer 20 --window 23 --hibf --output " + filename_index + " " + layout_file;
     std::string command_layout = filename_executable_chopper + " --num-hash-functions 2 --false-positive-rate 0.05 " +
                                                                "--input-file " + existing_filenames_building +
                                                        " --output-filename " + layout_file +
                                                        " --update-UBs 0 " +
-                                                       " --output-sketches-to chopper_sketch_sketches " +
+                                                       " --output-sketches-to "  + folder + "chopper_sketch_sketches " +
                                                        " --kmer-size 20"; //--tmax 64
 
     std::string ouptut_file = folder + "evaluation/tmp/" + "insertion_output.txt";
-    auto memory_time = execute_command(ouptut_file, command_layout);
+    auto memory_time_layout = execute_command(ouptut_file, command_layout);
     if (find_rebuild(ouptut_file, "rror")){
         std::cout << "error message!" <<std::flush;
         int n;
         std::cin >>n;//std::exit();
     }
-    memory_time = execute_command(ouptut_file, command_build);
+    auto memory_time_build = execute_command(ouptut_file, command_build);
     if (find_rebuild(ouptut_file, "rror")){
         std::cout << "error message!" <<std::flush;
         int n;
         std::cin >>n;//std::exit();
     }
-    return std::make_tuple(std::get<0>(memory_time), std::get<1>(memory_time), find_rebuild(ouptut_file, "Svenja+Myrthe"));
+    return std::make_tuple(std::get<0>(memory_time_layout) + std::get<0>(memory_time_build),
+            std::get<1>(memory_time_layout) + std::get<1>(memory_time_build), 1);
 }
 
 //!\brief query a single bin.
@@ -426,30 +490,53 @@ int write_to_python(std::string python_filename,
 
 
 
-
 //////////////////////////////////////////////////
 
 int main(){
-
+    std::string folder = std::filesystem::current_path(); folder += "/";
+    std::cout << "Give the test_folder, should be located within the evaluation folder: ";
+    std::string input_test; std::cin >> input_test;
 // PARAMETERS
-    std::string insertion_method = "find_ibf_idx_traverse_by_fpr";
-    std::string folder = "/mnt/c/Users/myrth/Desktop/coding/raptor/build/bin/";
-    std::string insertion_paths = folder + "evaluation/" + "update_bin_paths_multiple.txt";
-    std::string all_paths = folder + "evaluation/" + "half_of_bin_paths.txt"; //"all_bin_paths.txt";// existing bin paths, used for querying all bins.
-    std::string filename_index_original = "evaluation.index"; // this could best be an index without empty bins.
+    std::string insertion_paths = folder + "evaluation/" + input_test + "/insertion_paths.txt"; //"update_bin_paths_multiple.txt";
+    std::string all_paths = folder + "evaluation/" + input_test + "/existing_paths.txt";;//"half_of_bin_paths.txt"; //"all_bin_paths.txt";// existing bin paths, used for querying all bins.
+    std::string filename_index_original = "hibf.index";"evaluation.index"; // this could best be an index without empty bins.
+
     std::string filename_executable = folder +  "raptor";
-    std::string python_filename = folder + "evaluation/" + "results_";
+
+    // output
+    std::string python_filename = folder + "evaluation/" + "results/";
     std::string sketch_directory = folder +  "chopper_sketch_sketches";
     double sample_percentage = 0.001;
 
     //std::filesystem::remove_all("tmp");
+    system("mkdir evaluation");
+    system("mkdir evaluation/results");
     std::string filename_queries_existing = folder + "evaluation/tmp/" + "queries_original.fasta";
     std::string filename_queries = folder + "evaluation/tmp/" + "queries.fasta";
     system(("mkdir " +folder + "evaluation/tmp").c_str());
     std::string existing_filenames_building = folder + "evaluation/tmp/" + "existing_filenames.txt";
     system(("yes | cp -rf " + all_paths + " " + existing_filenames_building).c_str()); //make a copy of the file
 
-    std::string filename_index =  folder + "evaluation/tmp/" + "copy_" + filename_index_original;
+    std::string filename_index =  folder + "evaluation/tmp/" + filename_index_original;
+
+
+    /////////////
+    if (isLastLineEmpty(all_paths))   deleteLastLine(all_paths);
+    //copy chopper
+    system("cp ../_deps/raptor_chopper_project-src/build/bin/chopper chopper");
+
+    std::cout << folder <<std::flush;
+    std::cout << insertion_paths <<std::flush;
+    std::cout << all_paths <<std::flush;
+    std::cout << filename_index_original <<std::flush;
+    std::cout << filename_index <<std::flush;
+    std::cout << existing_filenames_building <<std::flush;
+    std::cout << filename_queries_existing <<std::flush;
+    std::cout << filename_queries <<std::flush;
+    std::cout << sketch_directory <<std::flush;
+    std::cout << python_filename <<std::flush;
+
+
 
     auto result = create_query_file(all_paths, filename_queries_existing, sample_percentage, folder);
     int number_of_files = std::get<0>(result); std::vector<std::string> tmp_query_filenames = std::get<1>(result);
@@ -460,9 +547,9 @@ int main(){
 
 
 // TODO test more bin files.
-for (auto insertion_method: {"naive", "find_ibf_idx_traverse_by_similarity", "find_ibf_idx_ibf_size", "find_ibf_idx_traverse_by_fpr", }){
-    std::cout << insertion_method << std::flush;
-    system(("yes | cp -rf " + folder + "evaluation/" + filename_index_original + " " + filename_index).c_str()); //make a copy of the file
+for (auto insertion_method: {"find_ibf_idx_ibf_size", "naive", "find_ibf_idx_traverse_by_similarity",  "find_ibf_idx_traverse_by_fpr", }){
+    std::cout << std::endl << std::endl  << insertion_method << std::endl  << std::flush;
+    system(("yes | cp -rf " + folder + "evaluation/" + input_test + "/" + filename_index_original + " " + filename_index + "_" +insertion_method).c_str()); //make a copy of the file
     system(("yes | cp -rf " + filename_queries_existing + " " + filename_queries).c_str()); //make a copy of the file
 
     // Result vectors
@@ -472,6 +559,7 @@ for (auto insertion_method: {"naive", "find_ibf_idx_traverse_by_similarity", "fi
     auto memory_time_queries = query_all_ubs(filename_queries, filename_index, filename_executable, number_of_files, folder, tmp_query_filenames); //  measure query times
     memory_query.push_back(std::get<0>(memory_time_queries));
     time_query.push_back(std::get<1>(memory_time_queries));
+    size_index.push_back(file_size(filename_index));
 
     for (const std::string& user_bin_filename : user_bin_filenames) {
         system("mkdir tmp"); //
@@ -492,9 +580,9 @@ for (auto insertion_method: {"naive", "find_ibf_idx_traverse_by_similarity", "fi
 
         std::tuple<int, double, bool> memory_time_insertion;
         if (insertion_method != "naive"){
-            auto memory_time_insertion = insert_ub(tmp_filename, filename_index,  filename_executable, sketch_directory, folder, insertion_method); //  measure insertion time and memory
+            memory_time_insertion = insert_ub(tmp_filename, filename_index,  filename_executable, sketch_directory, folder, insertion_method); //  measure insertion time and memory
         }else{
-            auto memory_time_insertion = rebuild_index(tmp_filename, filename_index,  filename_executable, sketch_directory, folder, existing_filenames_building); //  measure insertion time and memory
+            memory_time_insertion = rebuild_index(tmp_filename, filename_index,  filename_executable, sketch_directory, folder, existing_filenames_building); //  measure insertion time and memory
 
         }
         memory_insertion.push_back(std::get<0>(memory_time_insertion));
@@ -514,6 +602,10 @@ for (auto insertion_method: {"naive", "find_ibf_idx_traverse_by_similarity", "fi
 
     write_to_python(python_filename + insertion_method, time_insertion, time_query, memory_insertion, memory_query, size_index, rebuilds); //  write result vectors to python file.
 }
+// TODO test if all files have been added.
+// TODO built in a better way to ensure that each insertion/query was without errors
+// TODO copy over the index in evaluation/tmp . Load and check the samples.
+// TODO find index by size doesn't seem to go so well.
 // delete tmp files.
     return 0;
 }
