@@ -69,6 +69,9 @@ endif ()
 if (NOT TARGET raptor)
     add_executable ("raptor" raptor.cpp)
     target_link_libraries ("raptor" PUBLIC "raptor_lib")
+    set(SOURCE_FILES evaluation.cpp)
+    add_executable(evaluate ${SOURCE_FILES})
+    target_link_libraries ("evaluate" PUBLIC "raptor_lib")
 endif ()
 
 
@@ -81,3 +84,4 @@ add_subdirectory (search)
 add_subdirectory (threshold)
 add_subdirectory (upgrade)
 add_subdirectory (update)
+
