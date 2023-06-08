@@ -7,7 +7,7 @@ The default value is set to `0.5`, but it can be adjusted as needed.
 
 
 ### User Bin Modifications
-fThe user can update the content of a user bin by the flag `--insert-sequences`. The user should provide a file containing only the specific part of the sequence that needs to be added. The filename containing the new sequence content is the original filename, ending on
+The user can update the content of a user bin by the flag `--insert-sequences`. The user should provide a file containing only the specific part of the sequence that needs to be added. The filename containing the new sequence content is the original filename, ending on
 a specific appendix, which can be input by `--insert_sequence_appendix`. By default the ending is `"_insertsequences"`. It is the responsibility of the user to update the fasta files themselves, 
 such as by using the concatenate `cat` command. The HyperLogLog sketches are automatically updated during the index update process. 
 Note that sequence deletions are not supported. 

@@ -184,6 +184,8 @@ void search_parsing(sharg::parser & parser, bool const is_socks)
         arguments.shape = tmp.shape();
         arguments.shape_size = arguments.shape.size();
         arguments.shape_weight = arguments.shape.count();
+        assert(arguments.shape_size > 0);
+        assert(arguments.shape_weight > 0);
         arguments.window_size = tmp.window_size();
         arguments.parts = tmp.parts();
         arguments.compressed = tmp.compressed();

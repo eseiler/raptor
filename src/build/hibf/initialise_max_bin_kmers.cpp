@@ -26,7 +26,7 @@ namespace raptor::hibf
 * \param[in] empty_bin_kmers The variable is recursively passed on, such that merged bins are allocated suffiencient
  * space to accomodate all empty bins in its subtree.
  * \return The number of bins needed to store the max bin in this IBF.
-* \author Adapted by Myrthe Willemsen //TODO
+* \author Adapted by Myrthe Willemsen
 */
 template <seqan3::data_layout data_layout_mode>
 size_t initialise_max_bin_kmers(robin_hood::unordered_flat_set<size_t> & kmers,

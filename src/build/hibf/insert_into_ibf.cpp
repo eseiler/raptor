@@ -95,6 +95,7 @@ void insert_into_ibf(arguments_t const & arguments,
     {
         using sequence_file_t = seqan3::sequence_file_input<dna4_traits, seqan3::fields<seqan3::field::seq>>;
 
+        assert(arguments.shape.size() > 0);
         auto hash_view = seqan3::views::minimiser_hash(arguments.shape,
                                                        seqan3::window_size{arguments.window_size},
                                                        seqan3::seed{adjust_seed(arguments.shape.count())});
@@ -121,7 +122,13 @@ template void insert_into_ibf<upgrade_arguments>(upgrade_arguments const & argum
 
 namespace raptor{
 
-
+//!\brief A wrapper when rebuild_index_tuple is not needed
+void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers,
+                    std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
+                    raptor_index<index_structure::hibf> & index){
+    std::tuple <uint64_t, uint64_t> _ = std::make_tuple(0,0);
+    insert_into_ibf(kmers, index_triple, index, _);
+}
 
 /*!\brief This version of insert_into_ibf is only used for updating.
  * \param[in] kmers The kmers to be inserted.
@@ -135,7 +142,7 @@ namespace raptor{
 void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // kmers or minimizers
                     std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
                     raptor_index<index_structure::hibf> & index,
-                    std::tuple <uint64_t, uint64_t> rebuild_index_tuple) // change to std::set rebuild_indexes if using the splitting method.
+                    std::tuple <uint64_t, uint64_t> & rebuild_index_tuple) // change to std::set rebuild_indexes if using the splitting method.
                     // only if IBF is uncompressed.
 { // change this, so that if you have multiple technical bins of different sizes, you can create the chunks in accordance to these sizes.
     int union_count = 0; //You should somehow check if the bits set to 1 were already set to 1.
@@ -156,7 +163,7 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // km
         {
             auto const bin_index = seqan3::bin_index{static_cast<size_t>(bin_idx)}; // Convert the bin_idx to the type seqan3::bin_index
             union_count += ibf.emplace_exists(value, bin_index); // Union count value will remain 0 if inserted in an empty bin.
-        }
+        } // alternatively use membership agent and emplace. then no fork is needed.         //        auto agent = ibf.template counting_agent<uint16_t>(); auto & result = agent.bulk_count(sampled_kmers); union_count = result[bin_idx]
     }
 
     // to improve the implementation, Perhaps do the FPR calculations for all bins to which kmers will be inserted before actually inserting.

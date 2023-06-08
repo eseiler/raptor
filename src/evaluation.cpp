@@ -613,3 +613,40 @@ for (auto insertion_method: {"find_ibf_idx_traverse_by_similarity", "find_ibf_id
     return 0;
 }
 
+//1. Insert single bin and measure insertion time.
+std::tuple<int, double, bool>  insert_sequences(std::string filename_ub, std::string filename_index,
+                                   std::string filename_executable, std::string sketch_directory,
+                                   std::string folder, std::string insertion_method){
+    std::string command = filename_executable +
+                            " update " +
+                        " --hibf --insert-sequences" +
+                        " --input " +
+                          filename_index +
+                          " --bins " +
+                            filename_ub +
+                            " --sketch-directory " +
+                            sketch_directory +
+                            " --insertion-method " +
+                            insertion_method +
+                            " --sequence-similarity " +
+                          " --output " +
+                          filename_index;
+    //--insert_sequence_appendix. By default the ending is "_insertsequences". It is the responsibility of the user to update the fasta files themselves, such as by using the concatenate cat command.
+    //  a list of their filenames through the paremeter --bins
+
+    //1. Build a large index, with 64 and 1024 bins. Then add all sequence content of bin_00 to bin_0000, line by line. Concatenate the lines of bin_00 to bin_0000
+    //2. Add to a larger bin e.g. bin_00.
+
+    std::string insert_sequence_appendix = "_insertsequences";
+    std::string ouptut_file = folder + "evaluation/tmp/" + "insertion_output.txt";
+    auto memory_time = execute_command(ouptut_file, command);
+    if (find_rebuild(ouptut_file, "rror")){
+                std::cout << "[ERROR] error message detected!" <<std::flush;
+                std::cin.clear(); std::cin.get(); int n; std::cin >> n;//std::exit(); // TODO input is not always prompted.
+    }
+    if (not find_rebuild(ouptut_file, "[SUCCESS]")){
+        std::cout << "[ERROR] error message detected!" <<std::flush;
+        std::cin.clear(); std::cin.get(); int n; std::cin >> n;//std::exit();
+    }
+    return std::make_tuple(std::get<0>(memory_time), std::get<1>(memory_time), find_rebuild(ouptut_file, "Svenja+Myrthe"));
+}

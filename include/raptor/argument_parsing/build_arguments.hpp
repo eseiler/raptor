@@ -46,7 +46,7 @@ struct build_arguments
     bool is_minimiser{false};
 
     // Dynamic
-    bool update_seqs{0};
+    bool update_seqs{false};
 };
 
 } // namespace raptor

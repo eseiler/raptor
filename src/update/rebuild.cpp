@@ -40,7 +40,7 @@ void full_rebuild(raptor_index<index_structure::hibf> & index,
     raptor_index<index_structure::hibf> new_index{}; //create the empty HIBF of the subtree.
     build_arguments build_arguments = build_config(index, layout_arguments); // create the arguments to run the build algorithm with.
     call_build(build_arguments, new_index, true);
-    index = new_index;
+    index.ibf() = new_index.ibf();
     //4) initialize additional datastructures for the subindex.
     index.ibf().user_bins.initialize_filename_position_to_ibf_bin();
     index.ibf().initialize_previous_ibf_id();
@@ -93,9 +93,9 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
     //1.2) Obtain the kmer counts
     auto kmer_counts_filenames = get_kmer_counts(index, filenames_subtree);
     //1.3) Define how to split the IBF, in terms of merged bin indexes and user bin filenames
-    auto split_filenames = find_best_split(kmer_counts_filenames, number_of_splits);
+    auto split_files = split_filenames(kmer_counts_filenames, number_of_splits);
 
-    auto split_idxs = split_ibf(index_tuple, index, update_arguments, number_of_splits); // returns the new indices to attach the subtree
+    auto split_idxs = split_mb(index_tuple, index, update_arguments, number_of_splits); // returns the new indices to attach the subtree
 
     //1.5) Check the IBF bin count exceeds tmax, which might be possible if it has been resized. If tmax is exceeded, another build will be triggered inside the 'check tmax' function
     if (check_tmax_rebuild(index, ibf_idx, update_arguments)) return;
@@ -104,12 +104,12 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
     remove_ibfs(index, next_ibf_idx);
 
     for (int split = 0; split < number_of_splits; split++){ // for each subindex that is rebuild.
-        if (split_filenames[split].size()) {
-            if (split_filenames[split].size() == 1){ // if the subtree consists of a single user bin, than the user bin will be directly placed on the higher-level IBF.
+        if (split_files[split].size()) {
+            if (split_files[split].size() == 1){ // if the subtree consists of a single user bin, than the user bin will be directly placed on the higher-level IBF.
                 robin_hood::unordered_flat_set<size_t> kmers{}; // Initialize kmers.
-                std::vector<std::string> filename = {std::get<1>(split_filenames[split][0])};
+                std::vector<std::string> filename = {std::get<1>(split_files[split][0])};
                 raptor::hibf::compute_kmers(kmers, update_arguments, filename);
-                insert_into_ibf(kmers, std::make_tuple(ibf_idx, split_idxs[split], 1), index, std::make_tuple(0,0));       // fills the empty bin. no need to insert into parents.
+                insert_into_ibf(kmers, std::make_tuple(ibf_idx, split_idxs[split], 1), index);       // fills the empty bin. no need to insert into parents.
             }else{
                 //0) Create layout arguments
                 chopper::configuration layout_arguments = layout_config(index, update_arguments, std::to_string(split)); // create the arguments to run the layout algorithm with.
@@ -119,7 +119,7 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
                 raptor_index<index_structure::hibf> subindex{}; //create the empty HIBF of the subtree.
                 build_arguments build_arguments = build_config(index, layout_arguments); // create the arguments to run the build algorithm with.
                 robin_hood::unordered_flat_set<size_t> root_kmers = call_build(build_arguments, subindex, false); // the last argument sets the 'is_root' parameter to false such that kmers are added to `parent_kmers`. However, this causes that no shuffling takes place reducing the efficiency a bit. This could be further optimized perhaps by adding an extra parameter.
-                insert_into_ibf(root_kmers, std::make_tuple(ibf_idx, split_idxs[split], 1), index, std::make_tuple(0,0));       // also fills the (new) MB.
+                insert_into_ibf(root_kmers, std::make_tuple(ibf_idx, split_idxs[split], 1), index);       // also fills the (new) MB.
                 //4) initialize additional datastructures for the subindex.
                 subindex.ibf().initialize_previous_ibf_id();
                 subindex.ibf().initialize_ibf_sizes();
@@ -136,17 +136,17 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
     std::filesystem::create_directory("tmp");
 }
 
-/*!\brief
- * \details splits a merged bin and its child IBF.
+/*!\brief splits a merged bin
+ * \details splits a merged bin into 'number_of_splits', 2 by default, by finding empty bins on the IBF.
  * \param[in] index_tuple the ibf_idx and bin_idx of the merged bin that has reached the FPR limit.
  * \param[in] index the original HIBF
  * \param[in] number_of_splits In how many seperate IBFs must the IBF be split, 2 by default. This may be 1 if it is not split.
  * \author Myrthe Willemsen
  */
-std::vector<uint64_t> split_ibf(std::tuple<size_t,size_t> index_tuple, //rename to split_mb
+std::vector<uint64_t> split_mb(std::tuple<size_t,size_t> index_tuple,
                raptor_index<index_structure::hibf> & index,
                update_arguments const & update_arguments,
-               int number_of_splits)
+               int number_of_splits) // should be size_t
 {
     std::vector<uint64_t> tb_idxs(number_of_splits);
     index.ibf().delete_tbs(std::get<0>(index_tuple), std::get<1>(index_tuple));    // Empty the merged bin.
@@ -167,7 +167,7 @@ std::vector<uint64_t> split_ibf(std::tuple<size_t,size_t> index_tuple, //rename 
  * \param[in] number_of_splits In how many seperate IBFs must the IBF be split, 2 by default.
  * \author Myrthe Willemsen
  */
-std::vector<std::vector<std::tuple<size_t, std::string>>> find_best_split( //rename to split_filenames
+std::vector<std::vector<std::tuple<size_t, std::string>>> split_filenames(
         std::vector<std::tuple<size_t, std::string>> kmer_counts_filenames,
         int number_of_splits){
     assert(number_of_splits);
@@ -211,41 +211,11 @@ std::vector<std::tuple<size_t, std::string>> get_kmer_counts(raptor_index<index_
             kmer_counts_filenames.push_back(std::make_tuple(kmer_count, filename));
         }
     }
-    std::ranges::sort(kmer_counts_filenames);
+    std::ranges::sort(kmer_counts_filenames); //  std::ranges::sort(kmer_counts_filenames, std::ranges::greater);
     std::reverse(kmer_counts_filenames.begin(), kmer_counts_filenames.end());
     return kmer_counts_filenames; // array of tuples with filename and k-mer count, sorted descending by kmer count.
 }
 
-/*!\brief Store kmer or minimizer counts for each specified file stored within the HIBF.
- * \details The algorithm obtains the total kmer count for each file and stores those counts together with the
- * filenames to a text file. Alternatively, one can create/extract counts for these filenames by calling Chopper count
- * prints "filename kmer_count  filename" on each line.
- * \param[in] kmer_counts_filenames a set of filenames of which the counts should be stored.
- * \param[in] count_filename the filename to which the counts should be stored.
- * \author Myrthe Willemsen
- */
-void write_kmer_counts(std::vector<std::tuple<size_t, std::string>> kmer_counts_filenames,
-                       std::filesystem::path count_filename){
-    std::ofstream out_stream(count_filename.c_str()); // this should be different filenames, such that they can be ran in parellel
-    for (auto const & tuple : kmer_counts_filenames){
-                out_stream << std::get<1>(tuple) + '\t' + std::to_string(std::get<0>(tuple)) + '\t' + std::get<1>(tuple)  + '\n' ;
-        }
-    }
-
-
-/*!\brief Writes each of the specified files to a text file
- * \param[in] filenames a set of filenames of which the counts should be stored.
- * \param[in] user_bin_filenames the filename to which the counts should be stored.
- * \author Myrthe
- */
-void write_filenames(std::string bin_path, std::set<std::string> user_bin_filenames){
-    std::ofstream out_stream(bin_path.c_str());
-    for (auto const & filename : user_bin_filenames)
-        { if (std::filesystem::path(filename).extension() !=".empty_bin"){
-                out_stream << filename + '\n';
-            }
-        }
-    }
 
 /*!\brief Creates a configuration object which is passed to chopper's layout algorithm.
  * \param[in] update_arguments the file containing all paths to the user bins for which a layout should be computed
@@ -260,7 +230,7 @@ chopper::configuration layout_config(raptor_index<index_structure::hibf> & index
     std::filesystem::create_directory("tmp");
     chopper::configuration config{};
     //config.data_file = "tmp/temporary_layout" + file_indicator;
-    config.output_filename = "/tmp/temporary_layout" + file_indicator + ".txt";
+    config.output_filename = "tmp/temporary_layout" + file_indicator + ".txt"; // seqan tmp folder can be used later.
     config.data_file = "tmp/subtree_bin_paths.txt"; // input of bins paths
     config.sketch_directory = update_arguments.sketch_directory;
     config.disable_rearrangement = not update_arguments.similarity; // indicates whether updates should account for user bin's similarities. This also determines "estimate union"
@@ -303,7 +273,7 @@ void call_layout(std::vector<std::tuple<size_t, std::string>> kmer_counts_filena
         std::vector<chopper::sketch::hyperloglog> sketches{};
 
         try {
-            chopper::sketch::toolbox::read_hll_files_into(config.sketch_directory, filenames, sketches); // TODO give a warning inf not all sketches are found.
+            chopper::sketch::toolbox::read_hll_files_into(config.sketch_directory, filenames, sketches); // TODO give a warning if not all sketches are found.
             chopper::layout::insert_empty_bins(empty_bins, empty_bin_cum_sizes,
                               kmer_counts, sketches, filenames, config);
 
@@ -328,8 +298,9 @@ void call_layout(std::vector<std::tuple<size_t, std::string>> kmer_counts_filena
 build_arguments build_config(raptor_index<index_structure::hibf> & index,
                              chopper::configuration layout_arguments){
     build_arguments build_arguments{};
+    build_arguments.shape = index.shape(); // shape is more important then k-mer size.
     build_arguments.kmer_size = index.ibf().k;
-    build_arguments.window_size =  index.ibf().window_size;
+    build_arguments.window_size =  index.window_size();
     build_arguments.fpr = index.ibf().fpr_max;
     build_arguments.is_hibf = true;
     build_arguments.bin_file = layout_arguments.output_filename;
@@ -377,8 +348,7 @@ void remove_ibfs(raptor_index<index_structure::hibf> & index, size_t ibf_idx){
     // Store which original indices in the IBF were the subindex that had to be rebuild?
     std::vector<size_t> indices_to_remove = index.ibf().ibf_indices_childeren(ibf_idx);  // Create a map that maps remaining IBF indices of the original HIBF to their new indices
     indices_to_remove.push_back(ibf_idx);
-    std::vector<int> indices_map; indices_map.resize(index.ibf().ibf_vector.size()); // The map has the size in number of IBF's of the original index.
-    std::ranges::fill(indices_map, -1); // initialize with -1, such that empty bins, and the merged bins pointing to a removed IBF will have a pointer to -1.
+    std::vector<int> indices_map(index.ibf().ibf_vector.size(), -1);  // The map has the size in number of IBF's of the original index. Initialize with -1, such that empty bins, and the merged bins pointing to a removed IBF will have a pointer to -1.
     int counter = 0;// Initialize the result vector
     for (int i = 0; i <= index.ibf().ibf_vector.size(); i++) {
         if (std::find(indices_to_remove.begin(), indices_to_remove.end(), i) == indices_to_remove.end()) {  // If the current element is not in indices_to_remove.
@@ -393,7 +363,6 @@ void remove_ibfs(raptor_index<index_structure::hibf> & index, size_t ibf_idx){
     remove_indices(indices_to_remove, index.ibf().fpr_table);
     remove_indices(indices_to_remove, index.ibf().occupancy_table);
     remove_indices(indices_to_remove, index.ibf().user_bins.ibf_bin_to_filename_position);
-    index.ibf().ibf_sizes.erase(index.ibf().ibf_sizes.begin());
     for (size_t ibf_idx{0}; ibf_idx < index.ibf().next_ibf_id.size(); ibf_idx++) {     // Replace the (remaining) indices that have to be replaced.
         for (size_t i{0}; i < index.ibf().next_ibf_id[ibf_idx].size(); ++i){
             auto & next_ibf_idx = index.ibf().next_ibf_id[ibf_idx][i];

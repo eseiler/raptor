@@ -18,6 +18,7 @@
 namespace raptor::hibf
 {
 
+
 // automatically does naive splitting if number_of_bins > 1
 void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                      robin_hood::unordered_flat_set<size_t> const & kmers,
@@ -47,9 +48,11 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // km
 namespace raptor
 {
 using index_structure_t = std::conditional_t<seqan3::uncompressed, index_structure::hibf_compressed, index_structure::hibf>;
-
+void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers,
+                std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
+                raptor_index<index_structure::hibf> & index);
 void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // kmers or minimizers
                     std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
                     raptor_index<index_structure_t> & index,
-                     std::tuple <uint64_t, uint64_t> rebuild_index_tuple);  //Myrthe 20.10
+                     std::tuple <uint64_t, uint64_t> & rebuild_index_tuple);  //Myrthe 20.10
 } // namespace raptor

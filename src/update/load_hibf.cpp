@@ -29,9 +29,10 @@ void load_hibf(raptor_index<index_structure::hibf> & index, update_arguments & a
         auto some_compressed_ibf = index.ibf().ibf_vector[0];
         seqan3::interleaved_bloom_filter<seqan3::data_layout::compressed> ibf_uncompressed{some_compressed_ibf};
     }
-    arguments.shape =     seqan3::shape(seqan3::ungapped{20}); //index.ibf().shape; I can not use this, because, "shape in namespace seqan does not name a type"
-    arguments.window_size = index.ibf().window_size;
-
+    arguments.shape = index.shape();
+    arguments.window_size = index.window_size();
+    assert(arguments.shape.size() > 0);
+    assert(arguments.shape.count() > 0);
     return;
 }
 

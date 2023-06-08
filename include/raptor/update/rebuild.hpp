@@ -29,12 +29,12 @@ std::vector<std::tuple<size_t, std::string>> get_kmer_counts(raptor_index<index_
 void write_kmer_counts(std::vector<std::tuple<size_t, std::string>> kmer_counts_filenames,
                        std::filesystem::path count_filename);
 
-std::vector<uint64_t> split_ibf(std::tuple<size_t,size_t> index_tuple,
+std::vector<uint64_t> split_mb(std::tuple<size_t,size_t> index_tuple,
            raptor_index<index_structure::hibf> & index,
            update_arguments const & update_arguments,
            int number_of_splits = 2);
 
-std::vector<std::vector<std::tuple<size_t, std::string>>> find_best_split(
+std::vector<std::vector<std::tuple<size_t, std::string>>> split_filenames(
         std::vector<std::tuple<size_t, std::string>> kmer_counts_filenames,
         int number_of_splits = 2);
 

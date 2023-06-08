@@ -19,11 +19,9 @@ namespace raptor
 */
 struct update_arguments
 {
-    // needed for k-mer loading
-    seqan3::shape shape{seqan3::ungapped{20}};
-    uint32_t window_size{23};
-
-
+    // needed for k-mer loading, are set when loading the hibf.
+    seqan3::shape shape;
+    uint32_t window_size;
 
     uint8_t parts{1u};
     //!\brief The index is compressed

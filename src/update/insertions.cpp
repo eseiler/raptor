@@ -7,12 +7,12 @@
 #include "chopper/sketch/output.hpp"
 #include "chopper/sketch/toolbox.hpp"
 #include "chopper/sketch/execute.hpp"
+#include "chopper/next_multiple_of_64.hpp"
 
 namespace raptor
 {
-    auto next_multiple_of_64 = [](size_t value) {return ((value + 63) >> 6) << 6;};   // Takes a number and calculates the next multiple of 64
     auto new_bin_count = [](size_t number_of_bins, double eb_fraction, size_t ibf_bin_count){
-        return next_multiple_of_64(std::max((size_t) std::round((1+eb_fraction)
+        return chopper::next_multiple_of_64(std::max((size_t) std::round((1+eb_fraction)
         *ibf_bin_count), ibf_bin_count + number_of_bins));};
 /*!\brief Finds a location in the HIBF for a new UB.
  * \details The algorithm finds a suitable location in the existing HIBF for a new UB, by .
@@ -115,6 +115,7 @@ void insert_ubs(update_arguments const & update_arguments,
             std::string filename_cast = filename[0];
             std::cout << "Inserting bin: " << filename_cast << "\n";
             robin_hood::unordered_flat_set<size_t> kmers{}; // Initialize kmers.
+            assert(update_arguments.shape.size() > 0);
             raptor::hibf::compute_kmers(kmers, update_arguments, filename);
             size_t kmer_count = kmers.size();
             std::tuple <uint64_t, uint64_t, uint16_t> index_triple = get_location(kmer_count, kmers, index, update_arguments);  //  index_triple; bin_idx, ibf_idx, number_of_bins
@@ -160,7 +161,7 @@ void split_user_bin(std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
     }
     std::tuple <uint64_t, uint64_t, uint16_t> new_index_triple = std::make_tuple(ibf_idx, new_start_bin_idx, new_number_of_bins);
     raptor::hibf::compute_kmers(kmers, update_arguments, std::vector{filename}); // Get existing k-mers
-    insert_into_ibf(kmers, new_index_triple, index, std::make_tuple((uint16_t) 0, (uint16_t) 0)); // Insert the k-mer content of the user bin again.
+    insert_into_ibf(kmers, new_index_triple, index); // Insert the k-mer content of the user bin again.
     index.ibf().user_bins.update_filename_indices(filename, index_triple); // update additional datastructures.
 }
 
@@ -187,11 +188,11 @@ void insert_sequences(update_arguments const & update_arguments, raptor_index<in
                 raptor::hibf::compute_kmers(kmers, update_arguments, std::vector{filename_new_sequences});
                 std::tuple <uint64_t, uint64_t> rebuild_index_tuple = insert_tb_and_parents(kmers, index_triple, index);
                 update_sketch(filename, update_arguments, index, true);
-                if (std::get<0>(rebuild_index_tuple) == std::get<0>(index_triple))
-                    split_user_bin(index_triple, kmers, update_arguments, index, filename[0]); // If the user bin reaches the FPRmax, then it can simply be split over more technical bins.
-                else if (std::get<0>(rebuild_index_tuple) < index.ibf().ibf_vector.size()) // If the ibf_idx is lower than the total number of IBFs (the initilization value), then the respective IBF needs to be rebuild.
-                    partial_rebuild(rebuild_index_tuple, index, update_arguments, 2);
-
+                if (std::get<0>(rebuild_index_tuple) < index.ibf().ibf_vector.size()){ // If the ibf_idx is lower than the total number of IBFs (the initilization value), then the respective IBF needs to be rebuild.
+                    if (std::get<0>(rebuild_index_tuple) != std::get<0>(index_triple))
+                        partial_rebuild(rebuild_index_tuple, index, update_arguments, 2);
+                    else split_user_bin(index_triple, kmers, update_arguments, index, filename[0]); // If the user bin reaches the FPRmax, then it can simply be split over more technical bins.
+                }
 
         }
     }
@@ -341,8 +342,7 @@ uint64_t find_empty_bin_idx(raptor_index<index_structure::hibf> & index, size_t 
         }
     } // If nothing has been returned, no appropriate empty bin has been found and the bin idx will be the size of the IBF,
     bin_idx = ibf_bin_count; // then the IBF must be resized.
-    auto next_multiple_of_64 = [](size_t value) {return ((value + 63) >> 6) << 6;};   // Takes a number and calculates the next multiple of 64
-    size_t new_ibf_bin_count = next_multiple_of_64(std::max((size_t) std::round((1+update_arguments.empty_bin_percentage)
+    size_t new_ibf_bin_count = chopper::next_multiple_of_64(std::max((size_t) std::round((1+update_arguments.empty_bin_percentage)
             *ibf_bin_count), ibf_bin_count + number_of_bins));
     assert(new_ibf_bin_count > ibf_bin_count); // make sure that the new bin count is larger than the current IBF size.
     if (new_ibf_bin_count <= index.ibf().t_max){
@@ -378,7 +378,7 @@ size_t find_ibf_idx_ibf_size(size_t kmer_count, raptor_index<index_structure::hi
         }
         low = std::min(low, static_cast<int>(array.size())-1); // low = mid + 1, so it may happen that low equals the array.size.
         assert(low < array.size());
-        return std::get<1>(array[low]); // tODO head buffer overflow
+        return std::get<1>(array[low]);
     }
 
 
@@ -399,14 +399,8 @@ size_t find_ibf_idx_traverse_by_similarity(robin_hood::unordered_flat_set<size_t
     if (index.ibf().ibf_max_kmers(ibf_idx) > kmers.size()){ // kmer-capacity of IBF > bin size new UB, go down if possible. Instead of maximal capcity, you can calculate the optimal kmer_ size.
         auto agent = ibf.template counting_agent<uint16_t>();
         int num_kmers_to_sample = 0.01*kmers.size(); // Create a new unordered_flat_set to store the sampled kmers
-        robin_hood::unordered_flat_set<size_t> sampled_kmers;
-            // Randomly sample elements from kmers until the desired number is reached
-            while (sampled_kmers.size() < num_kmers_to_sample) { // Get a random iterator to an element in kmers
-                auto randomIter = kmers.begin();
-                std::advance(randomIter, std::rand() % kmers.size());
-                // Add the sampled element to the new unordered_flat_set
-                sampled_kmers.insert(*randomIter);
-            }
+        std::vector<size_t> sampled_kmers;
+        std::ranges::sample(kmers, std::back_inserter(sampled_kmers), num_kmers_to_sample, std::mt19937 {std::random_device {}()});
 
         auto & result = agent.bulk_count(sampled_kmers); // count occurrences of the kmers in each of the bins in the current IBF.
         size_t best_mb_idx = ibf.bin_count(); int best_similarity = -1; // initialize the best index outside of the ibf, such that we can use this after the loop to check if a MB was found.

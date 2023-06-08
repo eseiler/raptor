@@ -148,12 +148,8 @@ public:
     //!\brief K-mer size.
     uint8_t k{20};
 
-    //!\brief window size.
-    double window_size{23};
-
     //!\brief minimizer shape
     bool compute_minimiser{false};
-    std::string shape_string{};
 
     //!\brief The number of hash functions for the IBFs.
     size_t num_hash_functions{2};
@@ -170,7 +166,7 @@ public:
         return typename hierarchical_interleaved_bloom_filter<data_layout_mode>::membership_agent{*this};
     }
 
-    /*!\brief Returns the bin count (number of TBs) in an IBF.
+    /*!\brief Returns the  number of IBFs
      * \author Myrthe Willemsen
      */
     size_t ibf_count(){
@@ -209,7 +205,7 @@ public:
      * \param[in] bin_idx
      * \author Myrthe Willemsen
     */
-    size_t is_split_bin(size_t ibf_idx, size_t bin_idx){
+    size_t is_split_bin(size_t ibf_idx, size_t bin_idx){ // naming is not great
         size_t number_of_bins = 1;
         if (not is_merged_bin(ibf_idx, bin_idx)){ // the function assumes that only leaf bins can be split.
             std::string filename = user_bins[ibf_idx][bin_idx];
@@ -220,7 +216,7 @@ public:
 
     /*!\brief Remove adjacent TBs from the IBF.
      * \param[in] ibf_idx, bin_idx The indices of the TB to be removed.
-     * \param[in] number_of_bins. 1 by default
+     * \param[in] number_of_bins. 1 by default, but can be more for split bins.
      * \author Myrthe Willemsen
     */
     void delete_tbs(size_t ibf_idx, size_t bin_idx, size_t number_of_bins=1){
@@ -230,7 +226,7 @@ public:
             ibf.clear(bin_index);
             fpr_table[ibf_idx][bin_idx+offset] = 0;
             occupancy_table[ibf_idx][bin_idx+offset] = 0;
-            next_ibf_id[ibf_idx][bin_idx+offset] = -1;
+            next_ibf_id[ibf_idx][bin_idx+offset] = -1; // Try if we can change this to the current ibf rather than -1, or does this itnerfere with the attach subtree function?
         }
     }
 
@@ -241,10 +237,10 @@ public:
     */
     std::set<std::string> filenames_children(size_t ibf_idx){
         std::set<std::string> filenames;
-        for (size_t bin_idx=0; bin_idx < occupancy_table[ibf_idx].size(); ++bin_idx){
+        for (size_t bin_idx=0; bin_idx < occupancy_table[ibf_idx].size(); ++bin_idx){ // IMPROVEMENT could also be ibf_vector instead of occupancy_table
             if (is_merged_bin(ibf_idx, bin_idx)){ // recursively add filenames for merged bins.
                 std::set<std::string> filenames_mb = filenames_children(next_ibf_id[ibf_idx][bin_idx]); // add this set to filenames
-                std::merge(filenames.begin(), filenames.end(), filenames_mb.begin(), filenames_mb.end(), std::inserter(filenames, filenames.begin()));
+                std::merge(filenames.begin(), filenames.end(), filenames_mb.begin(), filenames_mb.end(), std::inserter(filenames, filenames.begin())); // IMPROVEMENT you could use a robin hood set and a lambda function, and make the function recursive.
             }else if(user_bins[ibf_idx][bin_idx] != ""){ // Otherwise an empty string is inserted, which causes downstream problems.
                 filenames.insert(user_bins[ibf_idx][bin_idx]);
             }
@@ -259,16 +255,24 @@ public:
      * \return child_indices
     * \author Myrthe Willemsen
     */
-    std::vector<size_t> ibf_indices_childeren(size_t ibf_idx, std::vector<size_t> child_indices = {}){
+    void ibf_indices_childeren_(size_t const ibf_idx, std::vector<size_t> & child_indices)
+    {
         for (size_t bin_idx=0; bin_idx < next_ibf_id[ibf_idx].size(); ++bin_idx){
             if (is_merged_bin(ibf_idx, bin_idx)){ // recursively for merged bins.
                 auto ibf_idx_mb = next_ibf_id[ibf_idx][bin_idx];
                 child_indices.push_back(ibf_idx);
-                ibf_indices_childeren(ibf_idx_mb, child_indices);
+                ibf_indices_childeren_(ibf_idx_mb, child_indices);
             }
         }
+    }
+
+    std::vector<size_t> ibf_indices_childeren(size_t ibf_idx)
+    {
+        std::vector<size_t> child_indices{};
+        ibf_indices_childeren_(ibf_idx, child_indices);
         return child_indices;
     }
+
 
     /*!\brief initialize the previous_ibf_id table
      * \details loop over the (key, item) entries in next_ibf_id, and store the reverse (item, key).
@@ -278,9 +282,9 @@ public:
     void initialize_previous_ibf_id(){
         previous_ibf_id.resize(ibf_vector.size());
         std::fill(previous_ibf_id.begin(), previous_ibf_id.end(), std::make_tuple(0,0)); // Initialize with root idx (i.e. 0).
-        for (uint64_t ibf_id_high=0; ibf_id_high < next_ibf_id.size(); ibf_id_high++){
-            for (uint64_t bin_idx=0;  bin_idx < next_ibf_id[ibf_id_high].size(); bin_idx++){
-                uint64_t ibf_id_low = next_ibf_id[ibf_id_high][bin_idx];
+        for (uint64_t ibf_id_high=0; ibf_id_high < next_ibf_id.size(); ++ibf_id_high){
+            for (uint64_t bin_idx=0;  bin_idx < next_ibf_id[ibf_id_high].size(); ++bin_idx){
+                uint64_t ibf_id_low = next_ibf_id[ibf_id_high][bin_idx]; // -1 in the next_ibf_id will be converted to a very high number, but currently it works out, because ibf_id_low != ibf_id_high still holds.
                 if (ibf_id_low != ibf_id_high){ // For leaf bins ibf_id_low equals ibf_id_high. For these we should not overwrite previous_ibf_id the entry, because we will lose the information on its parent IBF.
                      previous_ibf_id[ibf_id_low] = std::make_tuple((size_t) ibf_id_high, (size_t) bin_idx);
                 }
@@ -299,7 +303,7 @@ public:
      * \param[in] h number of hash functions used.
      * \param[in] s split bins: number of bins the among which the n k-mers are divided.
      * \param[in] d deleted k-mers: number of k-mers that were virtually deleted from this bin.
-     * \author Myrthe
+     * \author Myrthe Willemsen
      * \comment It might be computationally faster to work with log2 fpr values, to prevent the power to the h
      */
     double approximate_fpr(int m, int n, int h){// doesn't work with reference & // n=#occupied bits / number of kmers, m=length BF, h =#hash functions, deleted_kmers=0
@@ -309,7 +313,7 @@ public:
 
     double approximate_fpr(int m, int n, int h, int s){// n=#occupied bits / number of kmers, m=length BF, h =#hash functions, deleted_kmers=0
         return (1-pow(1 - approximate_fpr(m,(int) n/s,h), s)); // - deleted_kmers/(alphabet**k)
-    }
+    } // The calculations might be imprecise.
 
 
     /*!\brief Update false positive rate of a TB.
@@ -330,7 +334,8 @@ public:
             auto hash_funs = ibf.hash_function_count();
             fpr = approximate_fpr((int) bin_size, (int) kmer_count, (int) hash_funs, (int) number_of_bins); // if a split bin, i think it would be best to store the joint fpr, e.g. of both bins plus multiple testing. We can assume that the occupancy is alomst equal for the tbs among which a UB was split.
         }
-        for (size_t offset=0; offset < number_of_bins; offset++){  //loop over split bins and add multiple testing correction
+        //assert(bin_idx + number_of_bins <= fpr_table[ibf_idx].size()); test
+        for (size_t offset=0; offset < number_of_bins; ++offset){  //loop over split bins and add multiple testing correction
             fpr_table[ibf_idx][bin_idx+offset] = fpr;
         }
         assert(fpr<1);
@@ -350,8 +355,8 @@ public:
      * \param[in] ibf_idx, bin_idx, number_of_bins indices of the technical bin of interest
      * \author Myrthe Willemsen
     */
-    void update_occupancy_table(size_t kmer_count, size_t ibf_idx, size_t const bin_idx, size_t const number_of_bins = 1){
-        auto occupancy_per_bin = std::round(kmer_count/number_of_bins);
+    void update_occupancy_table(size_t const kmer_count, size_t const ibf_idx, size_t const bin_idx, size_t const number_of_bins = 1){
+        auto const occupancy_per_bin = std::max<size_t>(1, kmer_count/number_of_bins); // integer devision
         for (size_t offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table. Perhaps do this before inserting.
             occupancy_table[ibf_idx][bin_idx + offset] += occupancy_per_bin;
         }
@@ -363,13 +368,13 @@ public:
      * \return occupancy_per_file, the number of k-mers that the UB contains.
     * \author Myrthe Willemsen
     */
-    int get_occupancy_file(std::string const & filename) const
+    size_t get_occupancy_file(std::string const & filename) const
     {
         std::tuple <uint64_t, uint64_t, uint16_t> index_triple = user_bins.find_filename(filename);
         size_t const ibf_idx = std::get<0>(index_triple);
         size_t const bin_idx = std::get<1>(index_triple);
         size_t const number_of_bins = std::get<2>(index_triple);
-        int occupancy_per_file = 0;
+        size_t occupancy_per_file = 0;
         for (size_t offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table. Perhaps do this before inserting.
             occupancy_per_file += occupancy_table[ibf_idx][bin_idx + offset];
         }
@@ -387,7 +392,7 @@ public:
     * \author Myrthe Willemsen
     */
     void resize_ibf(size_t ibf_idx, size_t bin_count){ //details resize Ibf and datastructures. perhaps move to HIBF.hpp
-        ibf_vector[ibf_idx].increase_bin_number_to((seqan3::bin_count) bin_count);
+        ibf_vector[ibf_idx].increase_bin_number_to(seqan3::bin_count{bin_count});
         resize_ibf_occupancy_table(ibf_idx, bin_count);
         resize_ibf_fpr_table(ibf_idx, bin_count);
         user_bins.resize_ibf_filename_positions(ibf_idx, bin_count); // perhaps also update ibf_bin_to_filename_position
@@ -409,10 +414,10 @@ public:
      * \return occupancy_per_file, the number of k-mers that the UB contains.
      * \author Myrthe Willemsen
     */
-    double ibf_max_kmers(size_t ibf_idx){ // get fpr of a TB in a certain IBF. Makes more sense if this is part of interleaved_bloom_filter.hpp, but that is not part of the project. Myrthe. or bin_index const bin_idx
-        auto& ibf = ibf_vector[ibf_idx]; //  select the IBF       or hibf_ptr->ibf_vector.[ibf_idx] OR  auto& ibf = index.ibf().ibf_vector[ibf_idx]
-        size_t bin_size = ibf.bin_size();
-        size_t hash_funs = ibf.hash_function_count();//arguments.hash
+    double ibf_max_kmers(size_t ibf_idx) const{ // get fpr of a TB in a certain IBF. Makes more sense if this is part of interleaved_bloom_filter.hpp, but that is not part of the project. Myrthe. or bin_index const bin_idx
+        auto const& ibf = ibf_vector[ibf_idx]; //  select the IBF       or hibf_ptr->ibf_vector.[ibf_idx] OR  auto& ibf = index.ibf().ibf_vector[ibf_idx]
+        size_t const bin_size = ibf.bin_size();
+        size_t const hash_funs = ibf.hash_function_count();//arguments.hash
         return approximate_kmer_capacity(bin_size, hash_funs);
     }
 
@@ -423,9 +428,9 @@ public:
      * \return occupancy_per_file, the number of k-mers that the UB contains.
      * \author Myrthe Willemsen
      */
-    size_t approximate_kmer_capacity(int m, int h)
+    size_t approximate_kmer_capacity(int m, int h) const
     {
-        return -std::floor((m*log(1-pow(fpr_max, (double) 1/h))/h));
+        return -std::floor((m*log(1-pow(fpr_max, (double) 1/h))/h)); // TODO check function .
     }
 
     /*!\brief Initialize a table with bin sizes of all IBFs.
@@ -439,7 +444,7 @@ public:
         for (size_t ibf_idx=0; ibf_idx < ibf_vector.size(); ibf_idx++){
             ibf_sizes.push_back(std::make_tuple(ibf_max_kmers(ibf_idx), ibf_idx));
         }
-        sort(ibf_sizes.begin(), ibf_sizes.end());  // Sort by the first element of tuple
+        std::ranges::sort(ibf_sizes);  // Sort by the first element of tuple
     }
 
     /*!\brief Calculates the number of TBs needed to store a UB in a specific IBF.
@@ -454,7 +459,8 @@ public:
         auto& ibf = ibf_vector[ibf_idx]; // select the IBF
         int bin_size = ibf.bin_size();
         int hash_funs = ibf.hash_function_count();
-        int number_of_bins = std::ceil(kmer_count / ibf_max_kmers(ibf_idx)); // first guess without accounting for multiple testing correction
+        // alternatively size_t number_of_bins = (kmer_counts + ibf_max_kmers(ibf_idx) - 1)/ ibf_max_kmers(ibf_idx)
+        int number_of_bins = std::ceil(kmer_count / static_cast<double>(ibf_max_kmers(ibf_idx))); // first guess without accounting for multiple testing correction
         while (approximate_fpr(bin_size, (int) kmer_count, hash_funs, number_of_bins) > fpr_max){
             number_of_bins++;
         }
@@ -464,22 +470,7 @@ public:
     }
 
 
-    // Max_n (fpr, length bf in ibf, update_seqs=false)  calculate maximum
-    // if not update_seqs, then it is simply dependend on the fpr_max and bin size.
 
-//    double average_fpr(ibf_idx){
-//        // average over the fprs, skipping the empty bins
-//    }
-//    double min_fpr(ibf_idx){
-//        // average over the fprs, skipping the empty bins
-//    }
-//RESIZE HIBF
-//    void resize_hibf_fpr_table(size_t ibf_idx, size_t new_ibf_size){ //add new IBF to last index, with a vector of the size of the new IBF.
-//        assert(new_bin_count >= fpr_table[ibf_idx].size()); // check that new bin count is larger then the size.
-//        fpr_table.resize(fpr_table.size()+1);
-//    }
-
-// function for adding new ibf to the above
 
 
 #if RAPTOR_HIBF_HAS_COUNT
