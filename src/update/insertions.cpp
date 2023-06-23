@@ -170,7 +170,8 @@ void split_user_bin(std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
  * as well as its parent merged bins.
  * If sketches are used, then also the sketch of this UB is updated.
  * \guideline The user can provide a file specifically containing the part of the sequence that should be added, not the whole sequence.
- * By default this file ends with "_insertsequences", but can be set to a different appendix
+ * By default this file ends with "_insertsequences", but can be set to a different appendix.
+ * I.e. if you want to insert to the sample "bin_00.fasta", then the file containing the new sequences should be called "bin_00_insertsequences.fasta"
  * If this is not possible, the user can provide the
  * I should update hyperloglog sketches, wheres the user: updates sequence files yourself., e.g. using cat.
  * \param[in] kmers the set of kmers to be stored
@@ -184,7 +185,7 @@ void insert_sequences(update_arguments const & update_arguments, raptor_index<in
         }else{
                 robin_hood::unordered_flat_set<size_t> kmers{}; // Initialize k-mers.
                 std::tuple <uint64_t, uint64_t, uint16_t> index_triple = index.ibf().user_bins.find_filename(filename[0]);
-                std::string filename_new_sequences = filename[0] + update_arguments.insert_sequence_appendix;
+                std::string filename_new_sequences = filename[0].substr(0, filename[0].find_last_of('.')) + update_arguments.insert_sequence_appendix + filename[0].substr(filename[0].find_last_of('.'));
                 raptor::hibf::compute_kmers(kmers, update_arguments, std::vector{filename_new_sequences});
                 std::tuple <uint64_t, uint64_t> rebuild_index_tuple = insert_tb_and_parents(kmers, index_triple, index);
                 update_sketch(filename, update_arguments, index, true);

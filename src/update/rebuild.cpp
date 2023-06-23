@@ -350,7 +350,7 @@ void remove_ibfs(raptor_index<index_structure::hibf> & index, size_t ibf_idx){
     indices_to_remove.push_back(ibf_idx);
     std::vector<int> indices_map(index.ibf().ibf_vector.size(), -1);  // The map has the size in number of IBF's of the original index. Initialize with -1, such that empty bins, and the merged bins pointing to a removed IBF will have a pointer to -1.
     int counter = 0;// Initialize the result vector
-    for (int i = 0; i <= index.ibf().ibf_vector.size(); i++) {
+    for (int i = 0; i < index.ibf().ibf_vector.size(); i++) {
         if (std::find(indices_to_remove.begin(), indices_to_remove.end(), i) == indices_to_remove.end()) {  // If the current element is not in indices_to_remove.
             indices_map[i] = counter; // Add it to the result vector, such that indices_map[i] = counter. Do not use .push_back, because that will make the list not long enough
             counter += 1;
@@ -419,13 +419,16 @@ void attach_subindex(raptor_index<index_structure::hibf> & index,
             indices_map[filename_idx] = (index.ibf().user_bins.filename_to_idx.at(filename));
         }
     } // mapping works as follows: filename_idx --> idx_to_filename of subindex --> filename --> filename_to_idx of original index --> idx
+
     auto & bin_to_file = subindex.ibf().user_bins.ibf_bin_to_filename_position;
     for (size_t ibf_idx{0}; ibf_idx < bin_to_file.size(); ++ibf_idx){ // Add the size of the `index`, in number of IBFs, to all IBF indices in subindex's next_ibf_id.
         for (size_t bin_idx{0}; bin_idx < bin_to_file[ibf_idx].size(); ++bin_idx){
-                 bin_to_file[ibf_idx][bin_idx] =
-                         indices_map[bin_to_file[ibf_idx][bin_idx]];
+            if (bin_to_file[ibf_idx][bin_idx] != -1){ // if it is not an empty bin .
+                assert(bin_to_file[ibf_idx][bin_idx] < indices_map.size());
+                bin_to_file[ibf_idx][bin_idx] = indices_map[bin_to_file[ibf_idx][bin_idx]];
             }
         }
+    }
     append_to_vector(index.ibf().user_bins.ibf_bin_to_filename_position, bin_to_file);
 
     // Update the indices in one entry of the supporting tables, where are subindex must be attached, such that they refer to our new subindex.

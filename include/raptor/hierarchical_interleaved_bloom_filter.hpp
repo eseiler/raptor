@@ -186,6 +186,8 @@ public:
     */
     bool is_merged_bin(size_t ibf_idx, size_t bin_idx){
         auto const current_filename_index = user_bins.filename_index(ibf_idx, bin_idx);
+        assert(ibf_idx < next_ibf_id.size());
+        assert(bin_idx < next_ibf_id[ibf_idx].size());
         if (next_ibf_id[ibf_idx][bin_idx] != (int64_t) ibf_idx and next_ibf_id[ibf_idx][bin_idx] != -1){
             assert(current_filename_index < 0);
             return true;
@@ -386,7 +388,7 @@ public:
      * `ibf_bin_to_filename_position` are resized according to the new `bin_count`.
      * The latter is a private variable of the user_bins,
      * and is thus resized using a separate function that is part of that class.
-     * Note that one does not have to resize the next_ibf_id or previous_ibf_id.
+     * Note that one does not have to resize the previous_ibf_id.
      * \param[in] ibf_idx index of IBF in HIBF
      * \param[in] bin_count the number of bins to which the IBF has to be resized to.
     * \author Myrthe Willemsen
@@ -396,6 +398,9 @@ public:
         resize_ibf_occupancy_table(ibf_idx, bin_count);
         resize_ibf_fpr_table(ibf_idx, bin_count);
         user_bins.resize_ibf_filename_positions(ibf_idx, bin_count); // perhaps also update ibf_bin_to_filename_position
+        size_t original_size = next_ibf_id[ibf_idx].size();
+        next_ibf_id[ibf_idx].resize(bin_count);
+        std::fill(next_ibf_id[ibf_idx].begin() + original_size, next_ibf_id[ibf_idx].end(), -1); // initialize the new slots with -1.
     }
 
     void resize_ibf_occupancy_table(size_t ibf_idx, size_t new_bin_count){
