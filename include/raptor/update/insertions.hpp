@@ -10,6 +10,7 @@
 
 namespace raptor
 {
+    size_t new_bin_count(size_t number_of_bins, double eb_fraction, size_t ibf_bin_count);
     std::tuple <uint64_t, uint64_t, uint16_t> get_location(size_t kmer_count, robin_hood::unordered_flat_set<size_t> &kmers,
                                                        raptor_index<index_structure::hibf> & index,
                                                        update_arguments const & update_arguments);

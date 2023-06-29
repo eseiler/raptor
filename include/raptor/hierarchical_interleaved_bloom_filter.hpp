@@ -287,7 +287,7 @@ public:
         for (uint64_t ibf_id_high=0; ibf_id_high < next_ibf_id.size(); ++ibf_id_high){
             for (uint64_t bin_idx=0;  bin_idx < next_ibf_id[ibf_id_high].size(); ++bin_idx){
                 uint64_t ibf_id_low = next_ibf_id[ibf_id_high][bin_idx]; // -1 in the next_ibf_id will be converted to a very high number, but currently it works out, because ibf_id_low != ibf_id_high still holds.
-                if (ibf_id_low != ibf_id_high){ // For leaf bins ibf_id_low equals ibf_id_high. For these we should not overwrite previous_ibf_id the entry, because we will lose the information on its parent IBF.
+                if (ibf_id_low != ibf_id_high and ibf_id_low < previous_ibf_id.size()){ // For leaf bins ibf_id_low equals ibf_id_high. For these we should not overwrite previous_ibf_id the entry, because we will lose the information on its parent IBF.
                      previous_ibf_id[ibf_id_low] = std::make_tuple((size_t) ibf_id_high, (size_t) bin_idx);
                 }
             }
@@ -564,8 +564,10 @@ public:
                 assert(static_cast<size_t>(filename_position) < filename_position_to_ibf_bin.size());
 
                 auto & ibf_bin = filename_position_to_ibf_bin[filename_position];
-                if (std::get<2>(ibf_bin)) // split bin
+                if (std::get<2>(ibf_bin)){ // it is a split bin
+                    assert(std::get<0>(ibf_bin) == ibf_idx); // prevent that the same user bin exists in two different places
                     ++std::get<2>(ibf_bin);
+                }
                 else // as a user bin can take multiple bins, this should consist of multiple bin_idx or multiple tuples
                     ibf_bin = std::make_tuple(ibf_idx, bin_idx, 1u);
             }
@@ -609,10 +611,20 @@ public:
         size_t const ibf_idx = std::get<0>(index_triple);
         size_t const bin_idx = std::get<1>(index_triple);
         size_t const number_of_bins = std::get<2>(index_triple);
-        filename_position_to_ibf_bin.emplace_back(ibf_idx, bin_idx, number_of_bins);
-        ibf_bin_to_filename_position[ibf_idx][bin_idx] = user_bin_filenames.size() ;
-        filename_to_idx.emplace(filename, user_bin_filenames.size());
-        user_bin_filenames.push_back(filename); // make sure this is after the previous methods, such that they refer to the correct idnex.
+        size_t filename_position;
+        if (exists_filename(filename)){ // if the user bin already existed, e.g. in the case of sequence insertions, we have to change the existing etnries.
+            filename_position = filename_to_idx.at(filename);
+            filename_position_to_ibf_bin[filename_position] = index_triple;
+            ibf_bin_to_filename_position[ibf_idx][bin_idx] = filename_position ;
+        }else{
+            filename_position_to_ibf_bin.emplace_back(ibf_idx, bin_idx, number_of_bins);
+            filename_position = user_bin_filenames.size();
+            filename_to_idx.emplace(filename, filename_position);
+            user_bin_filenames.push_back(filename); // make sure this is after the previous methods, such that they refer to the correct idnex.
+        }
+        for (size_t offset=0; offset < number_of_bins; offset++){
+            ibf_bin_to_filename_position[ibf_idx][bin_idx + offset] = filename_position; // do this for all split bins.
+        }
     }
 
     /*!\brief Deletes a filename from the user bin datastructures

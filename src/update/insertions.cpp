@@ -11,9 +11,12 @@
 
 namespace raptor
 {
-    auto new_bin_count = [](size_t number_of_bins, double eb_fraction, size_t ibf_bin_count){
-        return chopper::next_multiple_of_64(std::max((size_t) std::round((1+eb_fraction)
-        *ibf_bin_count), ibf_bin_count + number_of_bins));};
+
+size_t new_bin_count(size_t number_of_bins, double eb_fraction, size_t ibf_bin_count){
+    return chopper::next_multiple_of_64(std::max((size_t) std::round((1+eb_fraction)
+        *ibf_bin_count), ibf_bin_count + number_of_bins));
+};
+
 /*!\brief Finds a location in the HIBF for a new UB.
  * \details The algorithm finds a suitable location in the existing HIBF for a new UB, by .
  * 1) looking for a proper IBF with one of the three algorithms
@@ -151,18 +154,20 @@ void split_user_bin(std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
     size_t start_bin_idx = std::get<1>(index_triple);
     size_t number_of_bins = std::get<2>(index_triple);
     index.ibf().delete_tbs(ibf_idx, start_bin_idx, number_of_bins);
-    size_t new_number_of_bins = std::ceil((int) number_of_bins * update_arguments.empty_bin_percentage);  // new number of bins * empty_bin_percentage
+    raptor::hibf::compute_kmers(kmers, update_arguments, std::vector{filename}); // Get existing k-mers. Those are appended to the k-mer array that is already loaded.
+    size_t new_number_of_bins = std::ceil((int) number_of_bins * (1 + update_arguments.empty_bin_percentage));  // new number of bins * empty_bin_percentage
+    new_number_of_bins = std::max(new_number_of_bins, index.ibf().number_of_bins(ibf_idx, (int) kmers.size()));       // make sure that the new number of bins is also sufficient to store the additional k-mers.
     size_t new_start_bin_idx = find_empty_bin_idx(index, ibf_idx, update_arguments, new_number_of_bins); // Find empty bins.
     size_t ibf_bin_count = index.ibf().ibf_vector[ibf_idx].bin_count();
-    if (new_start_bin_idx == ibf_bin_count){ // current solution TODO
-        size_t new_ibf_bin_count = new_bin_count(number_of_bins, update_arguments.empty_bin_percentage, ibf_bin_count);
+    if (new_start_bin_idx == ibf_bin_count){ // current solution. Alternatively, (1) calculate the new bin count of the IBF (2) check if this is larger than the tmax (3 - no) insert (3 yes) insert only in parents en rebuild subtree
+        size_t new_ibf_bin_count = new_bin_count(new_number_of_bins, update_arguments.empty_bin_percentage, ibf_bin_count);
         std::cout << "Resize the IBF at index: " << ibf_idx << "\n" << std::flush;
         index.ibf().resize_ibf(ibf_idx, new_ibf_bin_count);
     }
     std::tuple <uint64_t, uint64_t, uint16_t> new_index_triple = std::make_tuple(ibf_idx, new_start_bin_idx, new_number_of_bins);
-    raptor::hibf::compute_kmers(kmers, update_arguments, std::vector{filename}); // Get existing k-mers
-    insert_into_ibf(kmers, new_index_triple, index); // Insert the k-mer content of the user bin again.
-    index.ibf().user_bins.update_filename_indices(filename, index_triple); // update additional datastructures.
+    insert_tb_and_parents(kmers, new_index_triple, index); // Insert the k-mer content of the user bin again.
+    index.ibf().user_bins.update_filename_indices(filename, new_index_triple); // update additional datastructures.
+    check_tmax_rebuild(index, ibf_idx, update_arguments); // check if rebuilding is needed because of exceeding the tmax
 }
 
 /*!\brief Inserts sequences in existing UBs
@@ -185,6 +190,7 @@ void insert_sequences(update_arguments const & update_arguments, raptor_index<in
         }else{
                 robin_hood::unordered_flat_set<size_t> kmers{}; // Initialize k-mers.
                 std::tuple <uint64_t, uint64_t, uint16_t> index_triple = index.ibf().user_bins.find_filename(filename[0]);
+                assert(std::get<2>(index_triple)); // assert that the num_user_bins is not 0.
                 std::string filename_new_sequences = filename[0].substr(0, filename[0].find_last_of('.')) + update_arguments.insert_sequence_appendix + filename[0].substr(filename[0].find_last_of('.'));
                 raptor::hibf::compute_kmers(kmers, update_arguments, std::vector{filename_new_sequences});
                 std::tuple <uint64_t, uint64_t> rebuild_index_tuple = insert_tb_and_parents(kmers, index_triple, index);
@@ -239,8 +245,8 @@ void delete_ub(std::vector<std::string> const & filename,
         size_t const start_bin_idx = std::get<1>(index_triple);
         size_t const number_of_bins = std::get<2>(index_triple);
         index.ibf().delete_tbs(ibf_idx, start_bin_idx, number_of_bins);
+        index.ibf().user_bins.delete_filename(filename[0]);  // Update filename tables. Even if the UB did not exist, it might have been added through the STL's .find() function.
     }
-    index.ibf().user_bins.delete_filename(filename[0]);  // Update filename tables. Even if the UB did not exist, it might have been added through the STL's .find() function.
 }
 
 
@@ -338,8 +344,9 @@ uint64_t find_empty_bin_idx(raptor_index<index_structure::hibf> & index, size_t 
     size_t bin_idx{0}; // The variable is initialized outside the for loop, such that afterwards it can still be used.
     for (; bin_idx + number_of_bins < ibf_bin_count; bin_idx++){ // This could be implemented more efficiently.
         if (std::reduce(&index.ibf().occupancy_table[ibf_idx][bin_idx], // reduce sums over all values in the range
-                        &index.ibf().occupancy_table[ibf_idx][bin_idx+number_of_bins])==0){ //this range is empty, so a good location has been found. Std reduce should go from [bin_idx] to [bin_idx + 1]
-            return bin_idx;
+                        &index.ibf().occupancy_table[ibf_idx][bin_idx + number_of_bins])==0){ //this range is empty, so a good location has been found. Std reduce should go from [bin_idx] to [bin_idx + 1]
+            if (bin_idx + number_of_bins < ibf_bin_count)
+                return bin_idx;
         }
     } // If nothing has been returned, no appropriate empty bin has been found and the bin idx will be the size of the IBF,
     bin_idx = ibf_bin_count; // then the IBF must be resized.

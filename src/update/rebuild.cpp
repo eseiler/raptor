@@ -13,6 +13,7 @@
 #include <raptor/build/hibf/compute_kmers.hpp>
 #include <chopper/data_store.hpp>
 #include <chopper/layout/insert_empty_bins.hpp>
+#include <chopper/next_multiple_of_64.hpp>
 
 namespace raptor
 {
@@ -28,6 +29,7 @@ std::set<std::string> convert_to_set(std::vector<std::string> vector)
 //!\brief Rebuilds the complete index. Otherwise works similar to partial rebuild.
 void full_rebuild(raptor_index<index_structure::hibf> & index,
                   update_arguments const & update_arguments) {
+    std::cout << "Full rebuild" << std::flush;
     index.ibf().initialize_ibf_sizes();
     //0) Create layout arguments
     chopper::configuration layout_arguments = layout_config(index, update_arguments); // create the arguments to run the layout algorithm with.
@@ -114,7 +116,7 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
                 //0) Create layout arguments
                 chopper::configuration layout_arguments = layout_config(index, update_arguments, std::to_string(split)); // create the arguments to run the layout algorithm with.
                 //2) call chopper layout on the stored filenames.
-                call_layout(kmer_counts_filenames, layout_arguments);
+                call_layout(split_files[split], layout_arguments);
                 //3) call hierarchical build.
                 raptor_index<index_structure::hibf> subindex{}; //create the empty HIBF of the subtree.
                 build_arguments build_arguments = build_config(index, layout_arguments); // create the arguments to run the build algorithm with.
@@ -136,6 +138,7 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
     std::filesystem::create_directory("tmp");
 }
 
+
 /*!\brief splits a merged bin
  * \details splits a merged bin into 'number_of_splits', 2 by default, by finding empty bins on the IBF.
  * \param[in] index_tuple the ibf_idx and bin_idx of the merged bin that has reached the FPR limit.
@@ -150,9 +153,20 @@ std::vector<uint64_t> split_mb(std::tuple<size_t,size_t> index_tuple,
 {
     std::vector<uint64_t> tb_idxs(number_of_splits);
     index.ibf().delete_tbs(std::get<0>(index_tuple), std::get<1>(index_tuple));    // Empty the merged bin.
-
+    auto & ibf_idx = std::get<0>(index_tuple);
     for (int split = 0; split < number_of_splits; split++){             // get indices of the empty bins on the higher level IBF to serve as new merged bins.
-            tb_idxs[split] = find_empty_bin_idx(index, std::get<0>(index_tuple), update_arguments);       // find an empty bin for a new MB on this IBF or resize. Import from insertions.
+            tb_idxs[split] = find_empty_bin_idx(index, ibf_idx, update_arguments);       // find an empty bin for a new MB on this IBF or resize. Import from insertions.
+            size_t ibf_bin_count = index.ibf().ibf_vector[ibf_idx].bin_count();
+            if (tb_idxs[split] == ibf_bin_count){ // current solution when tmax is reached, because there are not sufficient empty bins
+                    size_t new_ibf_bin_count = new_bin_count(1u, update_arguments.empty_bin_percentage, ibf_bin_count);
+                    std::cout << "Resize the IBF at index: " << ibf_idx << "\n" << std::flush;
+                    index.ibf().resize_ibf(ibf_idx, new_ibf_bin_count);
+                }
+            else{
+                assert(std::get<0>(index_tuple) < index.ibf().occupancy_table.size());
+                assert(tb_idxs[split] < index.ibf().occupancy_table[ibf_idx].size());
+                index.ibf().occupancy_table[ibf_idx][tb_idxs[split]] = 1; // set some value to the occupancy table, such that not the same value is found twice
+            }
     }
     return tb_idxs;
 }
