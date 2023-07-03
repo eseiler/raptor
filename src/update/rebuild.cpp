@@ -31,6 +31,7 @@ void full_rebuild(raptor_index<index_structure::hibf> & index,
                   update_arguments const & update_arguments) {
     std::cout << "Full rebuild" << std::flush;
     index.ibf().initialize_ibf_sizes();
+    auto original_fpr = index.ibf().fpr_max;
     //0) Create layout arguments
     chopper::configuration layout_arguments = layout_config(index, update_arguments); // create the arguments to run the layout algorithm with.
     //1) Obtain kmer counts together with the filenames
@@ -47,6 +48,7 @@ void full_rebuild(raptor_index<index_structure::hibf> & index,
     index.ibf().user_bins.initialize_filename_position_to_ibf_bin();
     index.ibf().initialize_previous_ibf_id();
     index.ibf().initialize_ibf_sizes();
+    index.ibf().fpr_max = original_fpr;
     std::filesystem::remove_all("tmp");
     std::filesystem::create_directory("tmp");
 }
@@ -256,6 +258,9 @@ chopper::configuration layout_config(raptor_index<index_structure::hibf> & index
     config.determine_best_tmax = false;
 
     config.false_positive_rate = index.ibf().fpr_max;
+    if (update_arguments.insert_sequences)
+        config.false_positive_rate = index.ibf().fpr_max * (1 - update_arguments.empty_bin_percentage); // create an FPR buffer when working with sequence insertions. We cant do this based on 10% extra sequence insertions, you cannot solve that analytically. Here i supppose empty bin perscentage <1
+
     config.k = index.ibf().k;
     config.num_hash_functions = index.ibf().num_hash_functions;
 
@@ -315,7 +320,7 @@ build_arguments build_config(raptor_index<index_structure::hibf> & index,
     build_arguments.shape = index.shape(); // shape is more important then k-mer size.
     build_arguments.kmer_size = index.ibf().k;
     build_arguments.window_size =  index.window_size();
-    build_arguments.fpr = index.ibf().fpr_max;
+    build_arguments.fpr = layout_arguments.false_positive_rate;
     build_arguments.is_hibf = true;
     build_arguments.bin_file = layout_arguments.output_filename;
     return build_arguments;

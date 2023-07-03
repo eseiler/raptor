@@ -5,12 +5,10 @@ import importlib
 import matplotlib.patches as patches
 
 # TODO	Improve plot.
-# 	X-axis
-# 	Legend
+# 	Legend -> place outside.
 # 	Partial rebuilds (another shape)
-# 	Do not combine memory and time.
 # 	Cumulative plot
-#  split plots
+#  split plots -> create matrix; Do not combine memory and time.
 
 
 COLORL_grey = "#F0F0F0"
@@ -59,7 +57,17 @@ for method, colour in {"naive":COLOR_grey, "find_ibf_idx_traverse_by_similarity"
     mod = importlib.import_module(  method )
 
     x = np.arange(len(mod.time_query))
-    ax1.plot(x[:-1] + 0.5, mod.time_insertion, color=colour, marker='o', linestyle='', label='Time; ' + method) # Shifted x-values for the second and third plots
+    #for (rebuild_label, marker) in {}
+    ax1.plot(np.array([x[i] for i in x[:-1] if mod.rebuild[i] == 0]) + 0.5,
+             [mod.time_insertion[i] for i in x[:-1] if mod.rebuild[i] == 0],  color=colour, marker='o',   linestyle='', label='Time; ' + method) # Shifted x-values for the second and third plots
+    ax1.plot(np.array([x[i] for i in x[:-1] if mod.rebuild[i] == 1]) + 0.5,
+             [mod.time_insertion[i] for i in x[:-1] if mod.rebuild[i] == 1],  color=colour, marker='x', markersize=6, linestyle='') # Shifted x-values for the second and third plots
+    ax1.plot(np.array([x[i] for i in x[:-1] if mod.rebuild[i] == 2]) + 0.5,
+             [mod.time_insertion[i] for i in x[:-1] if mod.rebuild[i] == 2],  color=colour, marker='|', markersize=16, linestyle='') # Shifted x-values for the second and third plots
+
+
+
+
     ax1_twin.plot(x[:-1] + 0.5,  [t/1000000 for t in mod.memory_insertion], color='None', markeredgecolor=colour, marker='o', linestyle='--', label='Memory ' + method, alpha=0.5)
     ax2.plot(x, mod.time_query, color=colour, marker='o', linestyle='', label='Time')
     ax2_twin.plot(x, [t/1000000 for t in mod.memory_query], color='None', markeredgecolor=colour, marker='o', linestyle='--', label='Memory', alpha=0.5)
@@ -67,21 +75,21 @@ for method, colour in {"naive":COLOR_grey, "find_ibf_idx_traverse_by_similarity"
 
 
     # Annotate a point with partial rebuild
-    if method == "find_ibf_idx_traverse_by_fpr":
-        first_label = False
-        for i in range(len(mod.rebuild)):
-            if mod.rebuild[i] == 1:
-                if first_label == False:
-                    ax1.annotate('full rebuild', xy=(i + 0.5, mod.time_insertion[i]), xytext=(0, 20), textcoords='offset points', ha='center',
-                                 arrowprops=dict(arrowstyle='->'))
-                    first_label = True
-                else:
-                    ax1.annotate('', xy=(i + 0.5, mod.time_insertion[i]), xytext=(0, 20), textcoords='offset points', ha='center',
-                                 arrowprops=dict(arrowstyle='->'))
-            elif mod.rebuild[i] == 2:
-                print("x")
-                ax1.annotate('', xy=(i + 0.5, mod.time_insertion[i]), xytext=(0, 50), textcoords='offset points', ha='center',
-                             arrowprops=dict(arrowstyle='->'))
+    # if method == "find_ibf_idx_traverse_by_fpr":
+    #     first_label = False
+    #     for i in range(len(mod.rebuild)):
+    #         if mod.rebuild[i] == 1:
+    #             if first_label == False:
+    #                 ax1.annotate('full rebuild', xy=(i + 0.5, mod.time_insertion[i]), xytext=(0, 20), textcoords='offset points', ha='center',
+    #                              arrowprops=dict(arrowstyle='->')) #TODO 	Partial rebuilds (another shape); partial rebuild, triangle or empty star, full rebuild full star.
+    #                 first_label = True
+    #             else:
+    #                 ax1.annotate('', xy=(i + 0.5, mod.time_insertion[i]), xytext=(0, 20), textcoords='offset points', ha='center',
+    #                              arrowprops=dict(arrowstyle='->'))
+    #         elif mod.rebuild[i] == 2:
+    #             print("x")
+    #             ax1.annotate('', xy=(i + 0.5, mod.time_insertion[i]), xytext=(0, 50), textcoords='offset points', ha='center',
+    #                          arrowprops=dict(arrowstyle='->'))
     # ax3_twin.annotate('partial rebuild', xy=(label_rebuilds[0] + 0.5, size_index[label_rebuilds[0]]), xytext=(0, 20), textcoords='offset points', ha='center',
     #                   arrowprops=dict(arrowstyle='-')#, connectionstyle='arc3,rad=0.5')
     #                   )
@@ -98,10 +106,12 @@ ax3.yaxis.set_label_coords(-0.15, 0.5)
 ax3.set_ylabel('Index Size \n\n ', va='bottom', ha='center')
 
 # change x axis 
-ax3.set_xticklabels([])
+#ax3.set_xticklabels([10,20,30])
+ax3.set_xlabel('Number of inserted samples')
 ax1.tick_params(axis='x', bottom=False)  # Hide x-axis tick labels
 ax2.tick_params(axis='x', bottom=False)  # Hide x-axis tick labels
-ax3.tick_params(axis='x', bottom=False)  # Hide x-axis tick labels
+#ax3.tick_params(axis='x', bottom=False)  #  Hide x-axis tick labels
+
 #ax1.set_ylim(0, max(time_insertion)*1.5)
 ax1.set_xlim(0)#, len(mod.time_insertion))
 ax2.set_ylim(0)
@@ -109,6 +119,7 @@ ax1.set_ylim(0)
 ax1_twin.set_ylim(0)
 ax2_twin.set_ylim(0)
 ax3.set_yticklabels([])
+ax3.tick_params(axis='y', left=False)
 
 # legend
 ax1.legend(edgecolor="white", bbox_to_anchor=(0.2, 1), loc='upper left',)
@@ -157,7 +168,7 @@ for method, colour in {"mantis":COLOR_grey, "find_ibf_idx_traverse_by_fpr": COLO
     ax2.plot(x, mod.time_query, color=colour, marker='o', linestyle='', label='Time')
     ax2_twin.plot(x, [t/1000000 for t in mod.memory_query], color='None', markeredgecolor=colour, marker='o', linestyle='--', label='Memory', alpha=0.5)
     ax3_twin.plot(x, [t/1000000 for t in mod.size_index], color='None', markeredgecolor=colour, marker='o', linestyle='--', label='Size', alpha=0.5)
-    #TODO perhaps also make a plot of the cumulative time.
+    #TODO  make a plot of the cumulative time; plot it on ax2 with the times
 
     # Annotate a point with partial rebuild
     if method == "find_ibf_idx_traverse_by_fpr":

@@ -173,7 +173,7 @@ void write_to_fasta(std::string filename_queries, std::string filename, double s
         if (line[0] == '>')
             continue;
         dest_file << ">" + filename << std::endl;    // write fasta header.
-        dest_file << line << std::endl;
+        dest_file << line << std::endl; // TODO write a line of 250 bases by writing 3 lines.
         lineCount +=1;
         if (lineCount == 100){
             break;
@@ -307,7 +307,7 @@ std::tuple<int, std::vector<std::string>> create_query_file(std::string all_path
 //1. Insert single bin and measure insertion time.
 std::tuple<int, double, bool, bool>  insert_ub(std::string filename_ub, std::string filename_index,
                                    std::string filename_executable, std::string sketch_directory,
-                                   std::string folder, std::string insertion_method){
+                                   std::string folder, std::string insertion_method, std::string tmp_folder="tmp"){
     std::string command = filename_executable +
                             " update " +
                         " --hibf --insert-UBs " +
@@ -322,11 +322,11 @@ std::tuple<int, double, bool, bool>  insert_ub(std::string filename_ub, std::str
                             " --sequence-similarity " +
                           " --output " +
                           filename_index;
-    std::string ouptut_file = folder + "evaluation/tmp/" + "insertion_output.txt";
+    std::string ouptut_file = folder + "evaluation/"+ tmp_folder+"/" + "insertion_output.txt";
     auto memory_time = execute_command(ouptut_file, command);
     if (find_rebuild(ouptut_file, "rror")){
                 std::cout << "[ERROR] error message detected!" <<std::flush;
-                std::cin.clear(); std::cin.get(); int n; std::cin >> n;//std::exit(); // TODO input is not always prompted.
+                std::cin.clear(); std::cin.get(); int n; std::cin >> n;//std::exit();
     }
     if (not find_rebuild(ouptut_file, "[SUCCESS]")){
         std::cout << "[ERROR] error message detected!" <<std::flush;
@@ -372,7 +372,7 @@ std::tuple<int, double>  query_all_ubs(std::string filename_queries, std::string
                                        std::string filename_executable,  int number_of_queries,
                                        std::string folder,
                                        std::vector<std::string> tmp_query_filenames,
-                                       bool all_at_once = true ){
+                                       bool all_at_once = true, std::string tmp_folder="tmp" ){
     if (all_at_once) {
         std::string filename_ouptut = folder + "evaluation/tmp/" + "query_result.txt"; // temporary
         std::string command = filename_executable +
@@ -388,7 +388,7 @@ std::tuple<int, double>  query_all_ubs(std::string filename_queries, std::string
                               " --time --output " +
                               " --threads 1 " + // TODO include threads if possible?
                               filename_ouptut;
-        auto memory_time = execute_command(folder + "evaluation/tmp/" + "query_output.txt", command);
+        auto memory_time = execute_command(folder + "evaluation/"+ tmp_folder + "/" + "query_output.txt", command);
         if (find_rebuild(filename_ouptut, "rror")){
                 std::cout << "[ERROR] error message detected!" <<std::flush;
                 std::cin.clear(); std::cin.get(); int n; std::cin >> n;//std::exit();
@@ -640,7 +640,7 @@ for (auto insertion_method: {"find_ibf_idx_traverse_by_fpr", "find_ibf_idx_trave
 
 //INSERT SEQUENCES
 //1. Insert single bin and measure insertion time.
-std::tuple<int, double, bool>  insert_sequences(std::string filename_ub, std::string filename_index,
+std::tuple<int, double, bool, bool>  insert_sequences(std::string filename_ub, std::string filename_index,
                                    std::string filename_executable, std::string sketch_directory,
                                    std::string folder){
     std::string command = filename_executable +
@@ -675,7 +675,7 @@ std::tuple<int, double, bool>  insert_sequences(std::string filename_ub, std::st
         std::cout << "[ERROR] error message detected!" <<std::flush;
         std::cin.clear(); std::cin.get(); int n; std::cin >> n;//std::exit();
     }
-    return std::make_tuple(std::get<0>(memory_time), std::get<1>(memory_time), find_rebuild(ouptut_file, "Svenja+Myrthe"));
+    return std::make_tuple(std::get<0>(memory_time), std::get<1>(memory_time), find_rebuild(ouptut_file, "Svenja+Myrthe"), find_rebuild(ouptut_file, "Partial rebuild"));
 }
 //2. Insert single bin and measure insertion time.
 
@@ -794,13 +794,16 @@ int main_insert_seq(){
         std::system(("cat " + filename_new_sequences + " >> " + insert_to_ub ).c_str());
 
 
-         std::tuple<int, double, bool> memory_time_insertion = insert_sequences(insert_to_ub_paths, filename_index,
+         std::tuple<int, double, bool, bool> memory_time_insertion = insert_sequences(insert_to_ub_paths, filename_index,
                                filename_executable, sketch_directory,
                                folder);
         memory_insertion.push_back(std::get<0>(memory_time_insertion));
         time_insertion.push_back(std::get<1>(memory_time_insertion));
-        rebuilds.push_back((int) std::get<2>(memory_time_insertion));
-
+        if (std::get<3>(memory_time_insertion)){
+            rebuilds.push_back(2); // 2 inidicates a partial rebuild.
+        }else{
+            rebuilds.push_back((int) std::get<2>(memory_time_insertion));
+        }
         auto memory_time_queries = query_all_ubs(filename_queries, filename_index, filename_executable, number_of_files, folder, tmp_query_filenames); //  measure query times
         memory_query.push_back(std::get<0>(memory_time_queries));
         time_query.push_back(std::get<1>(memory_time_queries));
@@ -840,7 +843,7 @@ int main_insert_seq(){
 //1. Insert single bin and measure insertion time.
 std::tuple<int, double, bool> delete_ub(std::string filename_ub, std::string filename_index,
                                    std::string filename_executable, std::string sketch_directory,
-                                   std::string folder){
+                                   std::string folder,  std::string tmp_folder){
     std::string command = filename_executable +
                             " update " +
                         " --hibf --delete-UBs" +
@@ -854,7 +857,7 @@ std::tuple<int, double, bool> delete_ub(std::string filename_ub, std::string fil
                           filename_index;
 
     std::string insert_sequence_appendix = "_insertsequences";
-    std::string ouptut_file = folder + "evaluation/tmp/" + "insertion_output.txt";
+    std::string ouptut_file = folder + "evaluation/" + tmp_folder + "/" + "deletion_output.txt";
     auto memory_time = execute_command(ouptut_file, command);
     if (find_rebuild(ouptut_file, "rror")){
                 std::cout << "[ERROR] error message detected!" <<std::flush;
@@ -872,25 +875,29 @@ int main_del_seq(){
         std::string folder = std::filesystem::current_path(); folder += "/";
     std::cout << "Give the test_folder, should be located within the evaluation folder: ";
     std::string input_test; std::cin >> input_test;
+        std::cout << "Give the tmp folder: ";
+
+        std::string tmp_folder; std::cin >> tmp_folder;
+
 // PARAMETERS
     std::string insertion_paths = folder + "evaluation/" + input_test + "/insertion_paths.txt"; //"update_bin_paths_multiple.txt";
     std::string all_paths = folder + "evaluation/" + input_test + "/existing_paths.txt";;//"half_of_bin_paths.txt"; //"all_bin_paths.txt";// existing bin paths, used for querying all bins.
     std::string filename_index_original = "hibf.index";"evaluation.index"; // this could best be an index without empty bins.
-
+// TODO start with an index or around 100 bins.
     std::string filename_executable = folder +  "raptor";
 
     // output
-    std::string python_filename = folder + "evaluation/" + input_test + "results/";
+    std::string python_filename = folder + "evaluation/" + input_test + "/results/";
     std::string sketch_directory = folder +  "chopper_sketch_sketches";
     double sample_percentage = 0.001;
 
-    //std::filesystem::remove_all("tmp");
+    //std::filesystem::remove_all("" + tmp_folder + "");
     system("mkdir evaluation");
     system("mkdir evaluation/results");
-    std::string filename_queries_existing = folder + "evaluation/tmp/" + "queries_original.fasta";
-    std::string filename_queries = folder + "evaluation/tmp/" + "queries.fasta";
-    system(("mkdir " +folder + "evaluation/tmp").c_str());
-    std::string existing_filenames_building = folder + "evaluation/tmp/" + "existing_filenames.txt";
+    std::string filename_queries_existing = folder + "evaluation/" + tmp_folder + "/" + "queries_original.fasta";
+    std::string filename_queries = folder + "evaluation/" + tmp_folder + "/" + "queries.fasta";
+    system(("mkdir " +folder + "evaluation/" + tmp_folder + "").c_str());
+    std::string existing_filenames_building = folder + "evaluation/" + tmp_folder + "/" + "existing_filenames.txt";
     std::remove(existing_filenames_building.c_str()); // delete file first
     system(("yes | cp -f " + all_paths + " " + existing_filenames_building).c_str()); //make a copy of the file
 
@@ -918,18 +925,20 @@ int main_del_seq(){
 //o	Misschien in combinatie met seq insertions; insert delete insert etc. -> laten zien dat het niet groeit.
 // UB insertion
 // UB deletion ; all of the same size.
-    std::string tmp_filename = folder + "evaluation/tmp/tmp_input_file.txt";
+    std::string tmp_filename = folder + "evaluation/" + tmp_folder + "/tmp_input_file.txt";
     std::vector<double> time_insertion, time_query, memory_insertion, memory_query;
     std::vector<int> size_index, rebuilds, del_or_insert;
-    std::string insertion_paths_copy = "evaluation/tmp/insertion_paths_copy.txt ";
+    std::string insertion_paths_copy = "evaluation/" + tmp_folder + "/insertion_paths_copy.txt ";
     system(("yes | cp -f " + insertion_paths + " " + insertion_paths_copy).c_str()); //make a copy of the file
 
-    std::string filename_index =  folder + "evaluation/tmp/" "deletions" + "_" +  filename_index_original;
+    std::string filename_index =  folder + "evaluation/" + tmp_folder + "/" "deletions" + "_" +  filename_index_original;
     system(("yes | cp -rf " + folder + "evaluation/" + input_test + "/" + filename_index_original + " " + filename_index).c_str()); //make a copy of the file
 
 
  // delete insert delete delete insert insert
+ int user_bin_filenames_counter =0;
  for (int number_of_operatons = 0; number_of_operatons < 30; number_of_operatons++){
+     if (user_bin_filenames_counter + number_of_operatons < user_bin_filenames.size()){
      for (int _ = 0; _ < number_of_operatons; _++){
          std::ifstream existing_paths_opened(existing_filenames_building);
          std::string user_bin_filename;
@@ -938,44 +947,45 @@ int main_del_seq(){
          std::ofstream tmp_insertion_filename(tmp_filename);
          tmp_insertion_filename << user_bin_filename;
          tmp_insertion_filename.close();
-         auto memory_time_insertion = delete_ub(tmp_filename, filename_index,  filename_executable, sketch_directory, folder); //  measure insertion time and memory
+         auto memory_time_insertion = delete_ub(tmp_filename, filename_index,  filename_executable, sketch_directory, folder, tmp_folder); //  measure insertion time and memory
          memory_insertion.push_back(std::get<0>(memory_time_insertion));
         time_insertion.push_back(std::get<1>(memory_time_insertion));
         rebuilds.push_back((int) std::get<2>(memory_time_insertion));
         del_or_insert.push_back(1);
         system(("tail -n +2 " + existing_filenames_building +" > tmp.txt").c_str()); // Read the content of the file, excluding the first line /std::to_string(number_of_operatons + 1) +
         system(("mv tmp.txt " + existing_filenames_building).c_str()); // Overwrite the original file with the modified content ==>         delete last from existing_paths.
-    auto memory_time_queries = query_all_ubs(filename_queries, filename_index, filename_executable, number_of_files, folder, tmp_query_filenames); //  measure query times
-    memory_query.push_back(std::get<0>(memory_time_queries));
-    time_query.push_back(std::get<1>(memory_time_queries));
-    size_index.push_back(file_size(filename_index));
+            auto memory_time_queries = query_all_ubs(filename_queries, filename_index, filename_executable, number_of_files, folder, tmp_query_filenames, true, tmp_folder); //  measure query times
+            memory_query.push_back(std::get<0>(memory_time_queries));
+            time_query.push_back(std::get<1>(memory_time_queries));
+            size_index.push_back(file_size(filename_index));
          }
 
 
      for (int _ = 0; _ < number_of_operatons; _++){
+        std::string user_bin_filename = user_bin_filenames[user_bin_filenames_counter];
+         user_bin_filenames_counter +=1;
 
-         std::ifstream insertion_paths_opened(insertion_paths_copy);
-         std::string user_bin_filename;
-         while (user_bin_filename==""){
-             std::getline(insertion_paths_opened, user_bin_filename);
-         }
-         insertion_paths_opened.close();
+        // write new bin to temporary file.
          std::ofstream tmp_insertion_filename(tmp_filename);
          tmp_insertion_filename << user_bin_filename;
          tmp_insertion_filename.close();
-         system(("tail -n +2 " + insertion_paths_copy +" > tmp.txt").c_str()); // Read the content of the file, excluding the first line /std::to_string(number_of_operatons + 1) +
-        system(("mv tmp.txt " + insertion_paths_copy).c_str()); // Overwrite the original file with the modified content ==>         delete last from existing_paths.
-        auto memory_time_insertion = insert_ub(tmp_filename, filename_index,  filename_executable, sketch_directory, folder, "deletions"); //  measure insertion time and memory
+
+         // write to existing filenames.
+         std::ofstream existing_paths_opened(existing_filenames_building, std::ios_base::app);
+         existing_paths_opened <<  user_bin_filename << std::endl;
+         existing_paths_opened.close();
+
+        auto memory_time_insertion = insert_ub(tmp_filename, filename_index,  filename_executable, sketch_directory, folder, "find_ibf_idx_traverse_by_fpr", tmp_folder); //  measure insertion time and memory
         memory_insertion.push_back(std::get<0>(memory_time_insertion));
         time_insertion.push_back(std::get<1>(memory_time_insertion));
         rebuilds.push_back((int) std::get<2>(memory_time_insertion));
         del_or_insert.push_back(0);
-    auto memory_time_queries = query_all_ubs(filename_queries, filename_index, filename_executable, number_of_files, folder, tmp_query_filenames); //  measure query times
-    memory_query.push_back(std::get<0>(memory_time_queries));
-    time_query.push_back(std::get<1>(memory_time_queries));
-    size_index.push_back(file_size(filename_index));
+        auto memory_time_queries = query_all_ubs(filename_queries, filename_index, filename_executable, number_of_files, folder, tmp_query_filenames); //  measure query times
+        memory_query.push_back(std::get<0>(memory_time_queries));
+        time_query.push_back(std::get<1>(memory_time_queries));
+        size_index.push_back(file_size(filename_index));
 
-
+}
      }
      // expected result: rebuild after some time because merged bins grow in FPR.
      // before that, querying might take longer because of false hits. (depends on how much you query and if you insert the UBs that you deleted, how similart they are)

@@ -12,5 +12,5 @@ $MANTIS_BINARY merge -rm \
 	    -o $WORKING_DIRECTORY/mantis_merged # $MANTIS_INDEX
 
 
-
+#/scratch/dynamic_mantis/bin/mantis merge -rm -i1 /group/ag_abi/myrthew00/dynamic_mantis/mantis_bench/1024/mantis/ -i2 /group/ag_abi/myrthew00/dynamic_mantis/mantis_bench/1024/mantis_tmp -t 32 -o group/ag_abi/myrthew00/dynamic_mantis/mantis_bench/1024/mantis_merged
     #mantis merge -i1 <input_dir_1> -i2 <input_dir_2> [-t <num_threads>] -o <merge_output>
