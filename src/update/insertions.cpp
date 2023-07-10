@@ -348,7 +348,7 @@ uint64_t find_empty_bin_idx(raptor_index<index_structure::hibf> & index, size_t 
         if (std::reduce(&index.ibf().occupancy_table[ibf_idx][bin_idx], // reduce sums over all values in the range
                         &index.ibf().occupancy_table[ibf_idx][bin_idx + number_of_bins])==0 //this range is empty, so a good location has been found. Std reduce should go from [bin_idx] to [bin_idx_end - 1]
                         or std::reduce(&index.ibf().occupancy_table[ibf_idx][bin_idx], // reduce sums over all values in the range
-                        &index.ibf().occupancy_table[ibf_idx][bin_idx + number_of_bins])==number_of_bins){ // sometimes empty bins are filled with 1, a problem not resolved. The sum is then number_of_bins.
+                        &index.ibf().occupancy_table[ibf_idx][bin_idx + number_of_bins])==number_of_bins) // sometimes empty bins are filled with 1, a problem not resolved. The sum is then number_of_bins.
             if (bin_idx + number_of_bins - 1 < ibf_bin_count) return bin_idx; // bin_idx + number_of_bins - 1 is the last index that would be occupied.
 
     } // If nothing has been returned, no appropriate empty bin has been found and the bin idx will be the size of the IBF,
