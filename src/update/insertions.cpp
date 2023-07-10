@@ -36,6 +36,8 @@ std::tuple <uint64_t, uint64_t, uint16_t> get_location(size_t kmer_count, robin_
         ibf_idx = find_ibf_idx_traverse_by_similarity(kmers, index);
     else if (update_arguments.ibf_selection_method == "find_ibf_idx_ibf_size")
         ibf_idx = find_ibf_idx_ibf_size(kmers.size(), index);
+    else if (update_arguments.ibf_selection_method == "find_ibf_size_splitting")
+        ibf_idx = find_ibf_size_splitting(kmers.size(), index, update_arguments);
     else if (update_arguments.ibf_selection_method == "find_ibf_idx_traverse_by_fpr"){
         size_t ibf_idx_by_size = find_ibf_idx_traverse_by_fpr(kmer_count, index, root_idx);
         if (update_arguments.tmax_condition){
@@ -344,10 +346,11 @@ uint64_t find_empty_bin_idx(raptor_index<index_structure::hibf> & index, size_t 
     size_t bin_idx{0}; // The variable is initialized outside the for loop, such that afterwards it can still be used.
     for (; bin_idx + number_of_bins < ibf_bin_count; bin_idx++){ // This could be implemented more efficiently.
         if (std::reduce(&index.ibf().occupancy_table[ibf_idx][bin_idx], // reduce sums over all values in the range
-                        &index.ibf().occupancy_table[ibf_idx][bin_idx + number_of_bins])==0){ //this range is empty, so a good location has been found. Std reduce should go from [bin_idx] to [bin_idx + 1]
-            if (bin_idx + number_of_bins < ibf_bin_count)
-                return bin_idx;
-        }
+                        &index.ibf().occupancy_table[ibf_idx][bin_idx + number_of_bins])==0 //this range is empty, so a good location has been found. Std reduce should go from [bin_idx] to [bin_idx_end - 1]
+                        or std::reduce(&index.ibf().occupancy_table[ibf_idx][bin_idx], // reduce sums over all values in the range
+                        &index.ibf().occupancy_table[ibf_idx][bin_idx + number_of_bins])==number_of_bins){ // sometimes empty bins are filled with 1, a problem not resolved. The sum is then number_of_bins.
+            if (bin_idx + number_of_bins - 1 < ibf_bin_count) return bin_idx; // bin_idx + number_of_bins - 1 is the last index that would be occupied.
+
     } // If nothing has been returned, no appropriate empty bin has been found and the bin idx will be the size of the IBF,
     bin_idx = ibf_bin_count; // then the IBF must be resized.
     size_t new_ibf_bin_count = chopper::next_multiple_of_64(std::max((size_t) std::round((1+update_arguments.empty_bin_percentage)
@@ -388,6 +391,78 @@ size_t find_ibf_idx_ibf_size(size_t kmer_count, raptor_index<index_structure::hi
         assert(low < array.size());
         return std::get<1>(array[low]);
     }
+
+
+/*!\brief Finds an appropiate IBF for a UB insertion based on the number of k-mers and IBF sizes.
+ * \param[in] kmer_count The number of k-mers to be inserted.
+ * \param[in] index The HIBF.
+ * \return the IBF index to insert the new UB in.
+ * \details
+ * \author Myrthe Willemsen
+ */
+size_t find_ibf_size_splitting(size_t kmer_count, raptor_index<index_structure::hibf> & index,
+                               update_arguments const update_arguments){
+    auto & array = index.ibf().ibf_sizes;
+        int low = 0;
+        int high = array.size()-1;
+        while (low <= high) {
+            int mid = (low + high) >> 1;
+            assert(mid < array.size());
+            if (std::get<0>(array[mid]) < kmer_count)
+                {low = mid + 1;}
+            else if (std::get<0>(array[mid]) > kmer_count)
+                {high = mid - 1;}
+            else if (std::get<0>(array[mid]) == kmer_count)
+                {low = mid; break;} // exact kmer_count found
+        }
+        // SPLITTING BELOW
+        // If the found IBF ha sno empty bin, then check for each of the IBFs with a smaller size whether they have
+        // sufficient empty bins to insert the new user bin. If so, return the IBF index. If not, continue with the next section.
+        low = std::min(low, static_cast<int>(array.size())-1); // low = mid + 1, so it may happen that low equals the array.size.
+        assert(low < array.size());
+        auto low_perfect = low;
+        while (low >= 0){
+            auto ibf_idx = std::get<1>(array[low]);
+            auto& ibf = index.ibf().ibf_vector[ibf_idx]; //  select the IBF
+            auto number_of_bins = index.ibf().number_of_bins(ibf_idx, (int) kmer_count);       // calculate among how many bins we should split
+            size_t start_bin_idx = find_empty_bin_idx(index, ibf_idx, update_arguments, number_of_bins); // Find empty bins.
+            if (start_bin_idx + number_of_bins <= ibf.bin_count())
+                return(ibf_idx); // if we do find empty bins, just return this IBF.
+            else low -= 1;
+        }
+
+        // INSERTING IN LARGER IBFs
+        // Check for the parent ibf above if there is still an empty bin such that a partial rebuild can be done,
+        // If it has no space for empty bins before reaching the tmax, then check the IBFs with sizes between the original IBF and the parent IBF.
+        // Should any of them have an empty bin, then insert the user bin there.
+        // If not, then repeat the process for the parent of the parent.
+        // This way, empty bins will be filled up before the next full rebuild.
+        low = low_perfect;
+        size_t ibf_idx = std::get<1>(array[low]);
+
+        while (ibf_idx){ // while the ibf is not the root.
+            size_t parent_ibf_idx = std::get<0>(index.ibf().previous_ibf_id[ibf_idx]);
+            auto ibf_parent = index.ibf().ibf_vector[parent_ibf_idx];
+            if (static_cast<size_t>(find_empty_bin_idx(index, parent_ibf_idx, update_arguments, 1))
+                != ibf_parent.bin_count()){ // the parent has at least one empty bin, which should accomodate a partial rebuild.
+                    return ibf_idx; // this should trigger a resize and partial rebuild down the stream.
+            }else{
+                auto size_parent = ibf_parent.bin_size();
+                //low = low_perfect;
+                while (low < array.size() and std::get<1>(array[low]) < size_parent ){ // and thereby low will be lower than the maximum value of the array
+                    auto ibf_idx = std::get<1>(array[low]);
+                    size_t start_bin_idx = find_empty_bin_idx(index, ibf_idx, update_arguments, 1); // Find empty bins.
+                    if (start_bin_idx != index.ibf().ibf_vector[ibf_idx].bin_count())
+                        return(ibf_idx); // if we do find empty bins, just return this IBF.
+                    else
+                        low += 1;
+                }
+            }
+            size_t ibf_idx = parent_ibf_idx; // would be equal to using  ibf_idx= std::get<1>(array[low]);
+        }
+        return ibf_idx; // a full rebuild will be triggered.
+    }
+
 
 
 /*!\brief Finds an appropiate IBF for a UB insertion based on sequence similarity

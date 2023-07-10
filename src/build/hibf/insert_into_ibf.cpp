@@ -154,7 +154,7 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // km
     size_t const chunk_size = kmers.size() / number_of_bins + 1;
     size_t chunk_number{};
 
-    for (auto chunk : kmers | seqan3::views::chunk(chunk_size)) //QUESTION: Why cut it into chunks?
+    for (auto chunk : kmers | seqan3::views::chunk(chunk_size))
     {
         assert(chunk_number < number_of_bins);
         seqan3::bin_index const bin_idx{start_bin_idx + chunk_number};

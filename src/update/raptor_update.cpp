@@ -44,13 +44,13 @@ void raptor_update(update_arguments & arguments)
         }
         // if arguments.compressed, it should be compressed again
         if (index.shape().size() < 0){
-//    assert(arguments.shape.size() > 0);
-//    assert(arguments.shape.count() > 0);
-//                    index.shape() = arguments.shape;
-//     index.window_size() = arguments.window_size;
-                    std::cout << "shape disapeared"<<std::endl;
-                            std::ifstream is{arguments.in_file.string(),
-                         std::ios::binary};
+        //    assert(arguments.shape.size() > 0);
+        //    assert(arguments.shape.count() > 0);
+        //    index.shape() = arguments.shape;
+        //    index.window_size() = arguments.window_size;
+        std::cout << "shape disapeared"<<std::endl;
+        std::ifstream is{arguments.in_file.string(),
+        std::ios::binary};
         cereal::BinaryInputArchive iarchive{is};
         index.load_parameters(iarchive);
 

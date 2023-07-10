@@ -42,13 +42,8 @@ void full_rebuild(raptor_index<index_structure::hibf> & index,
     //3) call hierarchical build.
     raptor_index<index_structure::hibf> new_index{}; //create the empty HIBF of the subtree.
     build_arguments build_arguments = build_config(index, layout_arguments); // create the arguments to run the build algorithm with.
-    call_build(build_arguments, new_index, true);
-    index.ibf() = new_index.ibf();
-    //4) initialize additional datastructures for the subindex.
-    index.ibf().user_bins.initialize_filename_position_to_ibf_bin();
-    index.ibf().initialize_previous_ibf_id();
-    index.ibf().initialize_ibf_sizes();
-    index.ibf().fpr_max = original_fpr;
+    call_build(build_arguments, new_index, true); // The additional datastructures are therein also created
+    index.ibf() = new_index.ibf(); // QUESTION: the old data is of the ibf is automatically cleaned up right?
     std::filesystem::remove_all("tmp");
     std::filesystem::create_directory("tmp");
 }
@@ -124,9 +119,6 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
                 build_arguments build_arguments = build_config(index, layout_arguments); // create the arguments to run the build algorithm with.
                 robin_hood::unordered_flat_set<size_t> root_kmers = call_build(build_arguments, subindex, false); // the last argument sets the 'is_root' parameter to false such that kmers are added to `parent_kmers`. However, this causes that no shuffling takes place reducing the efficiency a bit. This could be further optimized perhaps by adding an extra parameter.
                 insert_into_ibf(root_kmers, std::make_tuple(ibf_idx, split_idxs[split], 1), index);       // also fills the (new) MB.
-                //4) initialize additional datastructures for the subindex.
-                subindex.ibf().initialize_previous_ibf_id();
-                subindex.ibf().initialize_ibf_sizes();
                 //5) merge the index of the HIBF of the newly obtained subtree with the original index.
                 attach_subindex(index, subindex, std::make_tuple(ibf_idx, split_idxs[split]));
             }
@@ -157,18 +149,21 @@ std::vector<uint64_t> split_mb(std::tuple<size_t,size_t> index_tuple,
     index.ibf().delete_tbs(std::get<0>(index_tuple), std::get<1>(index_tuple));    // Empty the merged bin.
     auto & ibf_idx = std::get<0>(index_tuple);
     for (int split = 0; split < number_of_splits; split++){             // get indices of the empty bins on the higher level IBF to serve as new merged bins.
-            tb_idxs[split] = find_empty_bin_idx(index, ibf_idx, update_arguments);       // find an empty bin for a new MB on this IBF or resize. Import from insertions.
-            size_t ibf_bin_count = index.ibf().ibf_vector[ibf_idx].bin_count();
-            if (tb_idxs[split] == ibf_bin_count){ // current solution when tmax is reached, because there are not sufficient empty bins
-                    size_t new_ibf_bin_count = new_bin_count(1u, update_arguments.empty_bin_percentage, ibf_bin_count);
-                    std::cout << "Resize the IBF at index: " << ibf_idx << "\n" << std::flush;
-                    index.ibf().resize_ibf(ibf_idx, new_ibf_bin_count);
-                }
-            else{
-                assert(std::get<0>(index_tuple) < index.ibf().occupancy_table.size());
-                assert(tb_idxs[split] < index.ibf().occupancy_table[ibf_idx].size());
-                index.ibf().occupancy_table[ibf_idx][tb_idxs[split]] = 1; // set some value to the occupancy table, such that not the same value is found twice
+        tb_idxs[split] = find_empty_bin_idx(index, ibf_idx, update_arguments);       // find an empty bin for a new MB on this IBF or resize. Import from insertions.
+        size_t ibf_bin_count = index.ibf().ibf_vector[ibf_idx].bin_count();
+        if (tb_idxs[split] == ibf_bin_count){ // current solution when tmax is reached, because there are not sufficient empty bins
+                size_t new_ibf_bin_count = new_bin_count(1u, update_arguments.empty_bin_percentage, ibf_bin_count);
+                std::cout << "Resize the IBF at index: " << ibf_idx << "\n" << std::flush;
+                index.ibf().resize_ibf(ibf_idx, new_ibf_bin_count);
             }
+        else{
+            assert(std::get<0>(index_tuple) < index.ibf().occupancy_table.size());
+            assert(tb_idxs[split] < index.ibf().occupancy_table[ibf_idx].size());
+            index.ibf().occupancy_table[ibf_idx][tb_idxs[split]] = 1; // set some value to the occupancy table, such that not the same value is found twice
+        }
+    }
+    for (int split = 0; split < number_of_splits; split++){             // get indices of the empty bins on the higher level IBF to serve as new merged bins.
+        index.ibf().occupancy_table[ibf_idx][tb_idxs[split]] = 0; // set back to 0
     }
     return tb_idxs;
 }
@@ -221,7 +216,8 @@ std::vector<std::tuple<size_t, std::string>> get_kmer_counts(raptor_index<index_
     std::vector<std::tuple<size_t, std::string>> kmer_counts_filenames{};
     for (std::string const & filename : filenames)
     {
-        if (std::filesystem::path filename_as_path{filename}; filename_as_path.extension() != ".empty_bin") // construct filename_as_path such that it can be used for comparison without going out of scope
+        if (std::filesystem::path filename_as_path{filename};
+        filename_as_path.extension() != ".empty_bin" and filename != "") // construct filename_as_path such that it can be used for comparison without going out of scope
         {
             int const kmer_count = index.ibf().get_occupancy_file(filename);
             kmer_counts_filenames.push_back(std::make_tuple(kmer_count, filename));
@@ -433,7 +429,8 @@ void attach_subindex(raptor_index<index_structure::hibf> & index,
     std::ranges::fill(indices_map, -1); // initialize with -1, such that empty bins, and the merged bins pointing to a removed IBF will have a pointer to -1.
     for (size_t filename_idx{0}; filename_idx < subindex_n_files; filename_idx++){
         auto filename = subindex.ibf().user_bins.user_bin_filenames[filename_idx];
-        if (std::filesystem::path filename_as_path{filename}; filename_as_path.extension() != ".empty_bin"){
+        if (std::filesystem::path filename_as_path{filename};
+        filename_as_path.extension() != ".empty_bin" and filename != ""){
             subindex.ibf().user_bins.user_bin_filenames[filename_idx];
             indices_map[filename_idx] = (index.ibf().user_bins.filename_to_idx.at(filename));
         }

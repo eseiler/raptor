@@ -35,6 +35,11 @@ robin_hood::unordered_flat_set<size_t> create_ibfs_from_chopper_pack(build_data<
     data.hibf.user_bins.initialize_filename_position_to_ibf_bin();
     data.hibf.initialize_previous_ibf_id();
     data.hibf.initialize_ibf_sizes();
+    data.hibf.fpr_max = arguments.fpr; // This parameter is added here as member to the HIBF datastructure, such that they will be stored and can be used during search or updating. Note: `window_size`, `compressed`, `parts`,  `bin_path` and `shape` stored as part of the `index` datastructure. `kmer_size` could be obtained from `shape`,
+    data.hibf.k = arguments.kmer_size;
+    data.hibf.compute_minimiser = arguments.compute_minimiser;
+    data.hibf.num_hash_functions = arguments.hash;
+
     return root_kmers; // this is used when rebuilding, to insert into the parent merged bin.
 }
 

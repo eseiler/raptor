@@ -17,6 +17,8 @@ namespace raptor
     void insert_ubs(update_arguments const & arguments, raptor_index<index_structure::hibf> & index);
     void delete_ub(std::vector<std::string> const & filename, raptor_index<index_structure::hibf> & index);
     size_t find_ibf_idx_traverse_by_fpr(size_t & kmer_count, raptor_index<index_structure::hibf> & index, size_t ibf_idx);
+    size_t find_ibf_size_splitting(size_t kmer_count, raptor_index<index_structure::hibf> & index,
+                               update_arguments const update_arguments);
     size_t find_ibf_idx_ibf_size(size_t kmer_count, raptor_index<index_structure::hibf> & index);
     uint64_t find_empty_bin_idx(raptor_index<index_structure::hibf> & index, size_t ibf_idx,
                                 update_arguments const & update_arguments, size_t number_of_bins=1);

@@ -12,6 +12,7 @@
 
 #include <seqan3/search/dream_index/interleaved_bloom_filter.hpp>
 #include <cereal/types/tuple.hpp>
+#include <cereal/types/unordered_map.hpp>
 
 #ifndef RAPTOR_HIBF_HAS_COUNT
 #    define RAPTOR_HIBF_HAS_COUNT 0
@@ -126,7 +127,7 @@ public:
     /*!\brief Stores for each bin in each IBF of the HIBF the ID of the previous IBF.
      * \details
      * Assume we look up an IBF `i`, i.e. `previous_ibf_id[i]`.
-     * If `(j =number_ibfs, b =0)` is returned, there is no higher level IBF, and IBF 'i' is thus the root IBF.
+     * If `previous_ibf_id[ibf_idx]=ibf_idx` is returned, there is no higher level IBF, and IBF 'i' is thus the root IBF.
      * If `j != number_ibfs` is returned, there is a higher level IBF , with `j` is the ID of the higher
      * level IBF in ibf_vector and bin `b` is the corresponding merged bin in this higher level IBF.
      * \author Myrthe
@@ -146,13 +147,13 @@ public:
     double t_max;
 
     //!\brief K-mer size.
-    uint8_t k{20};
+    uint8_t k;
 
     //!\brief minimizer shape
     bool compute_minimiser{false};
 
     //!\brief The number of hash functions for the IBFs.
-    size_t num_hash_functions{2};
+    size_t num_hash_functions;
 
     //!\brief Maximum (or optimal) number of k-mers (bin counts) that IBF could hold at that moment. The vector contains tuples of (ibf_size, ibf_idx), sorted by ibf size.
     std::vector<std::tuple<size_t, size_t>> ibf_sizes;
@@ -317,6 +318,19 @@ public:
         return (1-pow(1 - approximate_fpr(m,(int) n/s,h), s)); // - deleted_kmers/(alphabet**k)
     } // The calculations might be imprecise.
 
+    double compute_fpr(size_t const bin_size, size_t const kmer_count)
+    {
+        double const exp_arg = (num_hash_functions * kmer_count) / static_cast<double>(bin_size);
+        double const log_arg = 1.0 - std::exp(-exp_arg);
+        return std::exp(num_hash_functions * std::log(log_arg));
+    }
+
+    double compute_fpr(size_t const bin_size, size_t const kmer_count, size_t const split)
+    {
+        double const fpr_tb = compute_fpr(bin_size, (kmer_count + split - 1) / split); // fpr for a technical bin. Divide the k-mer count by the number of technical bins
+        return 1.0 - std::exp(std::log1p(-fpr_tb) * split);
+    }
+
 
     /*!\brief Update false positive rate of a TB.
      * \details Calculates the approximate false positive rate of a certain technical bin, given its indices in the HIBF, using the approximate_fpr function and updates .
@@ -334,7 +348,8 @@ public:
             auto& ibf = ibf_vector[ibf_idx]; //  select the IBF
             auto bin_size = ibf.bin_size();
             auto hash_funs = ibf.hash_function_count();
-            fpr = approximate_fpr((int) bin_size, (int) kmer_count, (int) hash_funs, (int) number_of_bins); // if a split bin, i think it would be best to store the joint fpr, e.g. of both bins plus multiple testing. We can assume that the occupancy is alomst equal for the tbs among which a UB was split.
+            fpr = compute_fpr(bin_size, kmer_count * number_of_bins, // the k-mer count is already over a single bin, so multiply this by the number of bins.
+                              number_of_bins); // if a split bin, i think it would be best to store the joint fpr, e.g. of both bins plus multiple testing. We can assume that the occupancy is alomst equal for the tbs among which a UB was split.
         }
         //assert(bin_idx + number_of_bins <= fpr_table[ibf_idx].size()); test
         for (size_t offset=0; offset < number_of_bins; ++offset){  //loop over split bins and add multiple testing correction
@@ -466,7 +481,7 @@ public:
         int hash_funs = ibf.hash_function_count();
         // alternatively size_t number_of_bins = (kmer_counts + ibf_max_kmers(ibf_idx) - 1)/ ibf_max_kmers(ibf_idx)
         int number_of_bins = std::ceil(kmer_count / static_cast<double>(ibf_max_kmers(ibf_idx))); // first guess without accounting for multiple testing correction
-        while (approximate_fpr(bin_size, (int) kmer_count, hash_funs, number_of_bins) > fpr_max){
+        while (compute_fpr(bin_size, kmer_count, number_of_bins) > fpr_max){
             number_of_bins++;
         }
         assert(number_of_bins);
@@ -506,6 +521,10 @@ public:
         archive(fpr_table);
         archive(previous_ibf_id);
         archive(fpr_max);
+        archive(k);
+        archive(t_max);
+        archive(ibf_sizes);
+        archive(num_hash_functions);
     }
     //!\endcond
 };
@@ -736,6 +755,8 @@ public:
     {
         archive(user_bin_filenames);
         archive(ibf_bin_to_filename_position);
+        archive(filename_position_to_ibf_bin);
+        archive(filename_to_idx);
     }
     //!\endcond
     };

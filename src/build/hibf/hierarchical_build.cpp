@@ -50,6 +50,7 @@ size_t hierarchical_build(robin_hood::unordered_flat_set<size_t> & parent_kmers,
     //auto lower_ibf_idx = ibf_positions[data.node_map[current_node].max_bin_index]; --> unused variable
     auto && ibf = construct_ibf(kmers, max_bin_tbs, current_node, data, arguments, empty_bin_kmers);
     data.hibf.occupancy_table[ibf_pos].resize(ibf.bin_count());
+    std::ranges::fill(data.hibf.occupancy_table[ibf_pos], 0); // fill with 0s to be sure.
     data.hibf.fpr_table[ibf_pos].resize(ibf.bin_count()); // Update the FPR and occupancy table for the dynamic HIBF.
     data.hibf.ibf_vector[ibf_pos] = ibf;// This is required for updating the fpr table during insert_into_ibf.
     insert_into_ibf(parent_kmers, kmers, std::make_tuple((uint64_t) ibf_pos, data.node_map[current_node].max_bin_index, // previously the insertion was part of the construct_ibf, however it makes more sense to seperate this.
@@ -64,13 +65,14 @@ size_t hierarchical_build(robin_hood::unordered_flat_set<size_t> & parent_kmers,
     for (size_t i = start; i < current_node_data.remaining_records.size(); ++i)
     {
         auto const & record = current_node_data.remaining_records[i];
-        if (std::filesystem::path(record.filenames[0]).extension() !=".empty_bin"){ // Only the first entry of `filenames` stores the actual filename, hence it has to be indexed with [0]
+        auto const & filename_path = std::filesystem::path(record.filenames[0]);
+        if (filename_path.extension() !=".empty_bin"){ // Only the first entry of `filenames` stores the actual filename, hence it has to be indexed with [0]
             compute_kmers(kmers, arguments, record);
             insert_into_ibf(parent_kmers, kmers, std::make_tuple((uint64_t) ibf_pos, (uint64_t) record.bin_indices.back(),
                             (uint64_t) record.number_of_bins.back()), data.hibf, ibf, is_root);
             kmers.clear();
         }else{ // if we are dealing with an empty bin, their size will be extracted and and added to `empty_bin_kmers`, which is to be passed on to parent merged bins.
-            std::string kmer_count = (std::string) std::filesystem::path(record.filenames[0]).stem(); // The empty bin's intended size will be extracted from the filename
+            std::string kmer_count = (std::string) filename_path.stem(); // The empty bin's intended size will be extracted from the filename
             double kmer_count_double = ::atof(kmer_count.c_str());
             empty_bin_kmers += static_cast<size_t>(kmer_count_double); // The empty bin's size is added to `empty_bin_kmers`, which is to be passed on to the parent merged bins of the empty bin.
         }
