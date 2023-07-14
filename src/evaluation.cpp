@@ -24,7 +24,7 @@ const extern int fpr = 0.05; // this is again hard-coded, because std::to_string
 const extern int num_hash_functions = 2;
 const extern int query_threads = 32;
 const extern int query_errors = 2;
-bool generate_reads = true;
+bool generate_reads = false;
 int number_of_reads = 100000;
 int read_length = 250;
 
@@ -296,8 +296,6 @@ std::tuple<int, std::vector<std::string>> create_query_file(std::string all_path
     else printf("Failed to delete the file.\n");
 
     if (generate_reads){
-//        reads_config cfg{}; // add params
-//        reads_generator(cfg); // TODO alternatively call the executable.
         std::string filename_executable = folder + "generate_reads";
         std::string command = filename_executable +
                                 " --output " + filename_queries +
@@ -305,7 +303,7 @@ std::tuple<int, std::vector<std::string>> create_query_file(std::string all_path
                                 " --number_of_reads "  +  std::to_string(number_of_reads)  +
                                 " --read_length "  +  std::to_string(read_length)  +
                                 " " + all_paths;
-        std::string ouptut_file = folder + "evaluation/"+ tmp_folder +"/" + "insertion_output.txt";
+        std::string ouptut_file = folder + "/evaluation/"+ tmp_folder +"/query_output.txt";
         execute_command(ouptut_file, command);
         if (not find_rebuild(ouptut_file, "[SUCCESS]")){
             std::cout << "[ERROR] error message detected!" <<std::flush;
@@ -393,7 +391,7 @@ std::tuple<int, double, bool, bool>  rebuild_index(std::string filename_ub, std:
                                                                " --output-sketches-to "  + folder + "chopper_sketch_sketches " +
                                                                " --kmer-size " +  std::to_string(kmer_size); //--tmax 64
 
-    std::string ouptut_file = folder + "evaluation/" + tmp_folder + "/" + "insertion_output.txt";
+    std::string ouptut_file = folder + "evaluation/" + tmp_folder + "/rebuild_output.txt";
     auto memory_time_layout = execute_command(ouptut_file, command_layout);
     if (find_rebuild(ouptut_file, "rror")){
         std::cout << "error message!" <<std::flush;
@@ -439,8 +437,8 @@ std::tuple<int, double>  query_all_ubs(std::string filename_queries, std::string
         std::string filename_ouptut_time = filename_ouptut + ".time";
         double memory = std::get<0>(memory_time); // This is a maximum, and does not need to be devided by the number of queries. It is also fine that it includes loading the index.
         //double time = std::get<1>(memory_time)/number_of_queries; // Extract time and memory consupmtion
-        double time = read_time(filename_ouptut_time) /
-                      number_of_queries;// Instead Extract time from the output file from raptor.
+        double time = read_time(filename_ouptut_time); // Instead Extract time from the output file from raptor.
+        if (not generate_reads) time = time / number_of_queries; // average. But for generate reads we have always a constant number of queries.
         return std::make_tuple(memory, time);
     }
     else{
@@ -595,15 +593,15 @@ int main_insert_ub(){
 
 
 
-    auto result = create_query_file(existing_filenames_building, filename_queries_existing, sample_percentage, folder);
+    auto result = create_query_file(existing_filenames_building, filename_queries_existing, sample_percentage, folder, tmp_folder);
     std::vector<std::string> tmp_query_filenames = std::get<1>(result);
     std::vector<std::string> user_bin_filenames = extract_filenames(insertion_paths);
 
 
 
-for (auto insertion_method: {"naive", "find_ibf_size_splitting", "find_ibf_idx_traverse_by_similarity", "find_ibf_idx_traverse_by_fpr", "find_ibf_idx_ibf_size",   }){
+for (auto insertion_method: {"find_ibf_size_splitting", "naive", "find_ibf_idx_traverse_by_similarity", "find_ibf_idx_traverse_by_fpr", "find_ibf_idx_ibf_size",   }){
     std::string filename_index =  folder + "evaluation/" + tmp_folder + "/" +insertion_method+ "_" +  filename_index_original;
-    int number_of_files = extract_filenames(existing_filenames_building).size(); // TODO write a function get number of lines instead.
+    int number_of_files = extract_filenames(filename_queries_existing).size(); // TODO write a function get number of lines instead.
     std::cout << std::endl << std::endl  << insertion_method << std::endl  << std::flush;
     system(("yes | cp -rf " + folder + "evaluation/" + input_test + "/" + filename_index_original + " " + filename_index).c_str()); //make a copy of the file
     system(("yes | cp -rf " + filename_queries_existing + " " + filename_queries).c_str()); //make a copy of the file
@@ -623,7 +621,7 @@ for (auto insertion_method: {"naive", "find_ibf_size_splitting", "find_ibf_idx_t
         counter += 1;
         system(("mkdir " + tmp_folder + "").c_str()); //
         number_of_files += 1;
-        std::cout << "Method: " << insertion_method << ", with urrent bin number: " << number_of_files << std::endl << std::flush;
+        std::cout << "Method: " << insertion_method << ", with current bin number: " << number_of_files << std::endl << std::flush;
         // store filename to a temporary file.
         size_t lastSlashPos = user_bin_filename.find_last_of("/");
         std::string lastPart = user_bin_filename.substr(lastSlashPos + 1);
@@ -956,7 +954,7 @@ int main_del_seq(){
 
 
 
-    auto result = create_query_file(existing_filenames_building, filename_queries_existing, sample_percentage, folder);
+    auto result = create_query_file(existing_filenames_building, filename_queries_existing, sample_percentage, folder, tmp_folder);
     system(("yes | cp -rf " + filename_queries_existing + " " + filename_queries).c_str()); //make a copy of the file
 
     int number_of_files = extract_filenames(existing_filenames_building).size(); std::vector<std::string> tmp_query_filenames = std::get<1>(result);

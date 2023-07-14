@@ -35,6 +35,7 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                      seqan3::interleaved_bloom_filter<> & ibf,
                      bool is_root)
 {
+    assert(kmers.size());
     size_t const ibf_idx = std::get<0>(index_triple);
     size_t const start_bin_idx = std::get<1>(index_triple);
     size_t const number_of_bins = std::get<2>(index_triple);

@@ -344,7 +344,7 @@ uint64_t find_empty_bin_idx(raptor_index<index_structure::hibf> & index, size_t 
     {
     size_t ibf_bin_count = index.ibf().ibf_vector[ibf_idx].bin_count();
     size_t bin_idx{0}; // The variable is initialized outside the for loop, such that afterwards it can still be used.
-    for (; bin_idx + number_of_bins < ibf_bin_count; bin_idx++){ // This could be implemented more efficiently.
+    for (; bin_idx + number_of_bins - 1 < ibf_bin_count; bin_idx++){ // This could be implemented more efficiently.
         if (std::reduce(&index.ibf().occupancy_table[ibf_idx][bin_idx], // reduce sums over all values in the range
                         &index.ibf().occupancy_table[ibf_idx][bin_idx + number_of_bins])==0 //this range is empty, so a good location has been found. Std reduce should go from [bin_idx] to [bin_idx_end - 1]
                         or std::reduce(&index.ibf().occupancy_table[ibf_idx][bin_idx], // reduce sums over all values in the range

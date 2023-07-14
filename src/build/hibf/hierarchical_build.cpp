@@ -53,7 +53,8 @@ size_t hierarchical_build(robin_hood::unordered_flat_set<size_t> & parent_kmers,
     std::ranges::fill(data.hibf.occupancy_table[ibf_pos], 0); // fill with 0s to be sure.
     data.hibf.fpr_table[ibf_pos].resize(ibf.bin_count()); // Update the FPR and occupancy table for the dynamic HIBF.
     data.hibf.ibf_vector[ibf_pos] = ibf;// This is required for updating the fpr table during insert_into_ibf.
-    insert_into_ibf(parent_kmers, kmers, std::make_tuple((uint64_t) ibf_pos, data.node_map[current_node].max_bin_index, // previously the insertion was part of the construct_ibf, however it makes more sense to seperate this.
+    if (kmers.size())
+        insert_into_ibf(parent_kmers, kmers, std::make_tuple((uint64_t) ibf_pos, data.node_map[current_node].max_bin_index, // previously the insertion was part of the construct_ibf, however it makes more sense to seperate this.
                             (uint64_t) max_bin_tbs), data.hibf, ibf, is_root); // previously the insertion was part of the construct_ibf, however it makes more sense to seperate this.
     kmers.clear(); // reduce memory peak
 

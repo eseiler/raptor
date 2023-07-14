@@ -301,22 +301,12 @@ public:
      * The third function also accounts for the .  number_deleted_kmers/(alphabet_size**k) is the probabibility that a too be searched kmer is the same as a deleted kmer (that is still present in the bloom filter)
      * \ref
      * Find the formulas in the corresponding publication
-     * \param[in] m size, in number of bits, of the bloom filter.
-     * \param[in] n k-mer count, i.e. the number of kmers stored in the technical bin.
-     * \param[in] h number of hash functions used.
-     * \param[in] s split bins: number of bins the among which the n k-mers are divided.
-     * \param[in] d deleted k-mers: number of k-mers that were virtually deleted from this bin.
+     * \param[in] bin_size size, in number of bits, of the bloom filter.
+     * \param[in] kmer_count k-mer count, i.e. the number of kmers stored in the technical bin.
+     * \param[in] split split bins: number of bins the among which the n k-mers are divided.
      * \author Myrthe Willemsen
      * \comment It might be computationally faster to work with log2 fpr values, to prevent the power to the h
      */
-    double approximate_fpr(int m, int n, int h){// doesn't work with reference & // n=#occupied bits / number of kmers, m=length BF, h =#hash functions, deleted_kmers=0
-       // when actually using deleted kmers, these need to be stored somewhere, and the value alphabet**k should be pre computed.
-        return pow((1-exp((double)-h*n/m)), h); // - deleted_kmers/(alphabet**k)
-    }
-
-    double approximate_fpr(int m, int n, int h, int s){// n=#occupied bits / number of kmers, m=length BF, h =#hash functions, deleted_kmers=0
-        return (1-pow(1 - approximate_fpr(m,(int) n/s,h), s)); // - deleted_kmers/(alphabet**k)
-    } // The calculations might be imprecise.
 
     double compute_fpr(size_t const bin_size, size_t const kmer_count)
     {
@@ -347,11 +337,9 @@ public:
         }else{
             auto& ibf = ibf_vector[ibf_idx]; //  select the IBF
             auto bin_size = ibf.bin_size();
-            auto hash_funs = ibf.hash_function_count();
             fpr = compute_fpr(bin_size, kmer_count * number_of_bins, // the k-mer count is already over a single bin, so multiply this by the number of bins.
                               number_of_bins); // if a split bin, i think it would be best to store the joint fpr, e.g. of both bins plus multiple testing. We can assume that the occupancy is alomst equal for the tbs among which a UB was split.
         }
-        //assert(bin_idx + number_of_bins <= fpr_table[ibf_idx].size()); test
         for (size_t offset=0; offset < number_of_bins; ++offset){  //loop over split bins and add multiple testing correction
             fpr_table[ibf_idx][bin_idx+offset] = fpr;
         }
