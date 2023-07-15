@@ -52,7 +52,8 @@ void loop_over_children(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                 size_t const mutex_id{parent_bin_index / 64};
                 std::lock_guard<std::mutex> guard{local_ibf_mutex[mutex_id]};
                 ibf_positions[parent_bin_index] = ibf_pos;
-                insert_into_ibf(parent_kmers, kmers,
+                if (kmers.size()) // it may happen that the the lower IBF only contains empty bins.
+                    insert_into_ibf(parent_kmers, kmers,
                                  std::make_tuple((uint64_t) ibf_pos_cur, (uint64_t) parent_bin_index, (uint64_t) 1),
                                  data.hibf, ibf, is_root);
             }
