@@ -14,9 +14,27 @@
 #include <chopper/data_store.hpp>
 #include <chopper/layout/insert_empty_bins.hpp>
 #include <chopper/next_multiple_of_64.hpp>
+#include <random>
+
 
 namespace raptor
 {
+
+
+std::string generate_random_string(int length) {
+    std::string characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, characters.length() - 1);
+
+    std::string result;
+    for (int i = 0; i < length; ++i) {
+        result += characters[dis(gen)];
+    }
+
+    return result;
+}
+const extern std::string tmp_folder = "tmp" + generate_random_string(10); // create a random tmp folder, s.t. multiple runs will not be in each others way.
 
 //!\brief helper function to convert vector of strings to set
 std::set<std::string> convert_to_set(std::vector<std::string> vector)
@@ -44,8 +62,8 @@ void full_rebuild(raptor_index<index_structure::hibf> & index,
     build_arguments build_arguments = build_config(index, layout_arguments); // create the arguments to run the build algorithm with.
     call_build(build_arguments, new_index, true); // The additional datastructures are therein also created
     index.ibf() = new_index.ibf(); // QUESTION: the old data is of the ibf is automatically cleaned up right?
-    std::filesystem::remove_all("tmp");
-    std::filesystem::create_directory("tmp");
+    std::filesystem::remove_all(tmp_folder);
+    std::filesystem::create_directory(tmp_folder);
 }
 
 bool check_tmax_rebuild(raptor_index<index_structure::hibf> & index, size_t ibf_idx,
@@ -128,8 +146,8 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
     index.ibf().initialize_ibf_sizes();
     index.ibf().user_bins.initialize_filename_position_to_ibf_bin(); // this also updates the filename_to_idx datastructure
     // remove temporary files
-    std::filesystem::remove_all("tmp");
-    std::filesystem::create_directory("tmp");
+    std::filesystem::remove_all(tmp_folder);
+    std::filesystem::create_directory(tmp_folder);
 }
 
 
@@ -230,6 +248,7 @@ std::vector<std::tuple<size_t, std::string>> get_kmer_counts(raptor_index<index_
 }
 
 
+
 /*!\brief Creates a configuration object which is passed to chopper's layout algorithm.
  * \param[in] update_arguments the file containing all paths to the user bins for which a layout should be computed
  * \param[in] index the original HIBF
@@ -239,12 +258,12 @@ std::vector<std::tuple<size_t, std::string>> get_kmer_counts(raptor_index<index_
 chopper::configuration layout_config(raptor_index<index_structure::hibf> & index,
                                      update_arguments const & update_arguments,
                                      std::string file_indicator){
-    std::filesystem::remove_all("tmp");
-    std::filesystem::create_directory("tmp");
+    std::filesystem::remove_all(tmp_folder);
+    std::filesystem::create_directory(tmp_folder);
     chopper::configuration config{};
     //config.data_file = "tmp/temporary_layout" + file_indicator;
-    config.output_filename = "tmp/temporary_layout" + file_indicator + ".txt"; // seqan tmp folder can be used later.
-    config.data_file = "tmp/subtree_bin_paths.txt"; // input of bins paths
+    config.output_filename = tmp_folder +"/temporary_layout" + file_indicator + ".txt"; // seqan tmp folder can be used later.
+    config.data_file = tmp_folder + "/subtree_bin_paths.txt"; // input of bins paths
     config.sketch_directory = update_arguments.sketch_directory;
     config.disable_rearrangement = not update_arguments.similarity; // indicates whether updates should account for user bin's similarities. This also determines "estimate union"
     config.disable_estimate_union = not update_arguments.similarity;

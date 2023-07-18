@@ -18,15 +18,68 @@
 
 #include <raptor/update/load_hibf.hpp>
 
-const extern int kmer_size = 32; // for real data
+const extern int kmer_size = 20; // for real data
 const extern int window_size = kmer_size;
 const extern int fpr = 0.05; // this is again hard-coded, because std::to_string(fpr) converts the fpr into 0.
 const extern int num_hash_functions = 2;
 const extern int query_threads = 32;
 const extern int query_errors = 2;
-bool generate_reads = false;
-int number_of_reads = 100000;
-int read_length = 250;
+const extern bool generate_reads = true;
+const extern int number_of_reads = 1000000;
+const extern int read_length = 250;
+
+#include <iostream>
+#include <fstream>
+#include <string>
+
+//int read_config() {
+//    // Read the configuration from the text file
+//    std::ifstream ifs("config.txt");
+//    std::string line;
+//    while (std::getline(ifs, line)) {
+//        std::string key, value;
+//        std::size_t pos = line.find('=');
+//        if (pos != std::string::npos) {
+//            key = line.substr(0, pos);
+//            value = line.substr(pos + 1);
+//        }
+//
+//        // Process the configuration variables
+//        if (key == "kmer_size") {
+//            int kmer_size = std::stoi(value);
+//            std::cout << "kmer_size: " << kmer_size << std::endl;
+//        } else if (key == "window_size") {
+//            int window_size = std::stoi(value);
+//            std::cout << "window_size: " << window_size << std::endl;
+//        } else if (key == "fpr") {
+//            double fpr = std::stod(value);
+//            std::cout << "fpr: " << fpr << std::endl;
+//        } else if (key == "num_hash_functions") {
+//            int num_hash_functions = std::stoi(value);
+//            std::cout << "num_hash_functions: " << num_hash_functions << std::endl;
+//        } else if (key == "query_threads") {
+//            int query_threads = std::stoi(value);
+//            std::cout << "query_threads: " << query_threads << std::endl;
+//        } else if (key == "query_errors") {
+//            int query_errors = std::stoi(value);
+//            std::cout << "query_errors: " << query_errors << std::endl;
+//        } else if (key == "generate_reads") {
+//            bool generate_reads = (value == "true");
+//            std::cout << "generate_reads: " << std::boolalpha << generate_reads << std::endl;
+//        } else if (key == "number_of_reads") {
+//            int number_of_reads = std::stoi(value);
+//            std::cout << "number_of_reads: " << number_of_reads << std::endl;
+//        } else if (key == "read_length") {
+//            int read_length = std::stoi(value);
+//            std::cout << "read_length: " << read_length << std::endl;
+//        }
+//    }
+//
+//    ifs.close();
+//    return 0;
+//}
+//
+
 
 double read_time(std::string filename){
     std::ifstream outputFile(filename);
@@ -511,18 +564,28 @@ long long convert_to_numeric(std::string size_with_suffix) {
     long long size;
     std::istringstream(size_with_suffix) >> size;
 
-    switch (suffix) {
-        case 'K':
-            return size * 1000;
-        case 'M':
-            return size * 1000000;
-        case 'G':
-            size_with_suffix = size_with_suffix.replace(size_with_suffix.find(','), 1, "."); // replace comma with point.
-            return stod(size_with_suffix) * 1000000000;
-        default:
-            return size;
+    try {
+        switch (suffix) {
+            case 'K':
+                return size * 1000;
+            case 'M':
+                return size * 1000000;
+            case 'G':
+                // Check if comma is present before replacing
+                if (size_with_suffix.find(',') != std::string::npos) {
+                    size_with_suffix.replace(size_with_suffix.find(','), 1, ".");
+                }
+                return stod(size_with_suffix) * 1000000000;
+            default:
+                return size;
+        }
     }
+    catch (const std::exception& e) {
+        // Handle the exception (print an error message, etc.)
+        std::cerr << "Error occurred: " << e.what() << std::endl;
+        return 0; // Return a default value or handle the error appropriately
     }
+}
 
 int file_size(std::string filename_index){
             // measure the size of the uncompressed index.
@@ -537,7 +600,7 @@ int file_size(std::string filename_index){
 
 int file_size_bash(std::string filename_index){
             // measure the size of the uncompressed index.
-            system(("du -sh " + filename_index + " | cut -f1 > temp_file.txt" ).c_str());
+            system(("du -s " + filename_index + " | cut -f1 > temp_file.txt" ).c_str()); // returns KB
             std::string result;
             std::ifstream temp_file("temp_file.txt");
             if (temp_file) {
@@ -557,7 +620,8 @@ int file_size_bash(std::string filename_index){
         std::cout << "filesize system: " << result << std::endl;
         // TODO use also the second method to obtain the filesize.
         //std::cout << "filesize system: "  << system(("du -sh " + filename_index + " | cut -f1)").c_str()) << std::endl;
-        auto fileSize = convert_to_numeric(result);
+        //auto fileSize = convert_to_numeric(result);
+        int fileSize = std::stod(result);
         return fileSize;
 }
 
@@ -646,7 +710,7 @@ int main_insert_ub(){
 
 
 
-for (auto insertion_method: {"naive", "find_ibf_idx_traverse_by_similarity", "find_ibf_idx_traverse_by_fpr", "find_ibf_idx_ibf_size", "find_ibf_size_splitting",   }){
+for (auto insertion_method: {"find_ibf_size_splitting", "find_ibf_idx_traverse_by_fpr", "naive", "find_ibf_idx_traverse_by_similarity",  "find_ibf_idx_ibf_size",   }){
     std::string filename_index =  folder + "evaluation/" + tmp_folder + "/" +insertion_method+ "_" +  filename_index_original;
     int number_of_files = extract_filenames(existing_filenames_building).size(); // TODO write a function get number of lines instead.
     std::cout << std::endl << std::endl  << insertion_method << std::endl  << std::flush;
@@ -761,7 +825,7 @@ std::tuple<int, double, bool, bool>  insert_sequences(std::string filename_ub, s
     std::string ouptut_file = folder + "evaluation/tmp/" + "insertion_output.txt";
     auto memory_time = execute_command(ouptut_file, command);
     if (find_rebuild(ouptut_file, "rror")){
-                std::cout << "[ERROR] error message detected!" <<std::flush;
+                std::cout << "[ERROR] error message detected!" <<std::endl;
                 std::cin.clear(); std::cin.get(); int n; std::cin >> n;//std::exit();
     }
     if (not find_rebuild(ouptut_file, "[SUCCESS]")){
@@ -996,17 +1060,30 @@ int main_del_seq(){
     ////////////
     system("cp ../_deps/raptor_chopper_project-src/build/bin/chopper chopper");
 
-    std::cout << folder <<std::flush;
-    std::cout << insertion_paths <<std::flush;
-    std::cout << all_paths <<std::flush;
-    std::cout << filename_index_original <<std::flush;
-//    std::cout << filename_index <<std::flush;
-    std::cout << existing_filenames_building <<std::flush;
-    std::cout << filename_queries_existing <<std::flush;
-    std::cout << filename_queries <<std::flush;
-    std::cout << sketch_directory <<std::flush;
-    std::cout << python_filename <<std::flush;
+    std::ofstream config("evaluation/results/configuration");
+    config  << "folder: " << folder <<std::endl;
+    config << "tmp_folder: " << tmp_folder <<std::endl;
+    config << "kmer_size: " << kmer_size <<std::endl;
+    config << "window_size: " << window_size <<std::endl;
+    config << "fpr: " << fpr <<std::endl;
+    config << "num_hash_functions: " << num_hash_functions <<std::endl;
+    config << "kmer_size: " << kmer_size <<std::endl;
+    config << "query_threads: " << query_threads <<std::endl;
+    config << "query_errors: " << query_errors <<std::endl;
+    config << "generate_reads: " << kmer_size <<std::endl;
+    config << "number_of_reads: " << kmer_size <<std::endl;
+    config << "read_length: " << kmer_size <<std::endl<<std::endl;
 
+    config << "insertion_paths: " << insertion_paths <<std::endl;
+    config << "all_paths " << all_paths <<std::endl;
+    config << "filename_index_original: "<< filename_index_original <<std::endl;
+//    config << filename_index <<std::endl;
+    config << "existing_filenames_building:" << existing_filenames_building <<std::endl;
+    config << "filename_queries_existing: " << filename_queries_existing <<std::endl;
+    config << "filename_queries: " << filename_queries <<std::endl;
+    config << "sketch_directory: " << sketch_directory <<std::endl;
+    config << "python_filename: " << python_filename <<std::endl;
+    config.close();
 
 
     auto result = create_query_file(existing_filenames_building, filename_queries_existing, sample_percentage, folder, tmp_folder);
