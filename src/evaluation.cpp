@@ -505,6 +505,24 @@ std::vector<std::string> extract_filenames(std::string insertion_paths){
     return filenames;
 }
 
+long long convert_to_numeric(std::string size_with_suffix) {
+    char suffix = size_with_suffix.back();
+    size_with_suffix.pop_back();
+    long long size;
+    std::istringstream(size_with_suffix) >> size;
+
+    switch (suffix) {
+        case 'K':
+            return size * 1000;
+        case 'M':
+            return size * 1000000;
+        case 'G':
+            size_with_suffix = size_with_suffix.replace(size_with_suffix.find(','), 1, "."); // replace comma with point.
+            return stod(size_with_suffix) * 1000000000;
+        default:
+            return size;
+    }
+    }
 
 int file_size(std::string filename_index){
             // measure the size of the uncompressed index.
@@ -512,6 +530,34 @@ int file_size(std::string filename_index){
         file_index.seekg(0, file_index.end);
         int fileSize = file_index.tellg(); // number of bytes.
         file_index.seekg(0, file_index.beg);
+        std::cout << "filesize CPP: " << fileSize << std::endl;
+        return fileSize;
+}
+
+
+int file_size_bash(std::string filename_index){
+            // measure the size of the uncompressed index.
+            system(("du -sh " + filename_index + " | cut -f1 > temp_file.txt" ).c_str());
+            std::string result;
+            std::ifstream temp_file("temp_file.txt");
+            if (temp_file) {
+                std::getline(temp_file, result);
+                temp_file.close();
+            }
+
+            // Remove newline characters from the end of the result string
+            if (!result.empty() && result.back() == '\n') {
+                result.pop_back();
+            }
+
+            // Remove the temporary file
+            std::remove("temp_file.txt");
+
+
+        std::cout << "filesize system: " << result << std::endl;
+        // TODO use also the second method to obtain the filesize.
+        //std::cout << "filesize system: "  << system(("du -sh " + filename_index + " | cut -f1)").c_str()) << std::endl;
+        auto fileSize = convert_to_numeric(result);
         return fileSize;
 }
 
@@ -528,13 +574,14 @@ std::string outstring(std::vector<T> out_array){
 int write_to_python(std::string python_filename,
                     std::vector<double> time_insertion, std::vector<double> time_query,
                     std::vector<double> memory_insertion, std::vector<double> memory_query,
-                    std::vector<int> size_index, std::vector<int> rebuild){
+                    std::vector<int> size_index, std::vector<int> size_index_bash, std::vector<int> rebuild){
     std::ofstream o(python_filename + ".py"); // "here.py");//
     o << "time_insertion = [" << outstring(time_insertion) << "]" <<std::endl;
     o << "time_query = [" << outstring(time_query) << "]" <<std::endl;
     o << "memory_insertion = [" << outstring(memory_insertion) << "]" <<std::endl;
     o << "memory_query = [" << outstring(memory_query) << "]" <<std::endl;
     o << "size_index = [" << outstring(size_index) << "]" <<std::endl;
+    o << "size_index_bash = [" << outstring(size_index) << "]" <<std::endl;
     o << "rebuild = [" << outstring(rebuild) << "]" <<std::endl;
 
     o.close();
@@ -599,9 +646,9 @@ int main_insert_ub(){
 
 
 
-for (auto insertion_method: {"find_ibf_size_splitting", "naive", "find_ibf_idx_traverse_by_similarity", "find_ibf_idx_traverse_by_fpr", "find_ibf_idx_ibf_size",   }){
+for (auto insertion_method: {"naive", "find_ibf_idx_traverse_by_similarity", "find_ibf_idx_traverse_by_fpr", "find_ibf_idx_ibf_size", "find_ibf_size_splitting",   }){
     std::string filename_index =  folder + "evaluation/" + tmp_folder + "/" +insertion_method+ "_" +  filename_index_original;
-    int number_of_files = extract_filenames(filename_queries_existing).size(); // TODO write a function get number of lines instead.
+    int number_of_files = extract_filenames(existing_filenames_building).size(); // TODO write a function get number of lines instead.
     std::cout << std::endl << std::endl  << insertion_method << std::endl  << std::flush;
     system(("yes | cp -rf " + folder + "evaluation/" + input_test + "/" + filename_index_original + " " + filename_index).c_str()); //make a copy of the file
     system(("yes | cp -rf " + filename_queries_existing + " " + filename_queries).c_str()); //make a copy of the file
@@ -609,12 +656,13 @@ for (auto insertion_method: {"find_ibf_size_splitting", "naive", "find_ibf_idx_t
 
     // Result vectors
     std::vector<double> time_insertion, time_query, memory_insertion, memory_query;
-    std::vector<int> size_index, rebuilds;
+    std::vector<int> size_index, size_index_bash, rebuilds;
     // check time and size before updating
     auto memory_time_queries = query_all_ubs(filename_queries, filename_index, filename_executable, number_of_files, folder, tmp_query_filenames, true, tmp_folder); //  measure query times
     memory_query.push_back(std::get<0>(memory_time_queries));
     time_query.push_back(std::get<1>(memory_time_queries));
     size_index.push_back(file_size(filename_index));
+    size_index_bash.push_back(file_size_bash(filename_index));
     int counter=0;
     for (const std::string& user_bin_filename : user_bin_filenames) {
         // TODO change such that we can include a batch size.
@@ -630,8 +678,11 @@ for (auto insertion_method: {"find_ibf_size_splitting", "naive", "find_ibf_idx_t
         tmp_insertion_filename << user_bin_filename;
         tmp_insertion_filename.close();
         // update all paths and queries
-        write_to_fasta(filename_queries, user_bin_filename, sample_percentage); // all queries together
-        // TODO change query method; increase the query size, e.g. length 250 error is 2. use a constant number of queries per index.
+        if (generate_reads){
+                auto result = create_query_file(existing_filenames_building, filename_queries_existing, sample_percentage, folder);
+        }else{
+                    write_to_fasta(filename_queries, user_bin_filename, sample_percentage); // all queries together
+        }
         // because otherwise you might measure the time difference by parallelization
         // or increase query size and put threads to 0, but that does not make it very comparable to mantis.
 
@@ -649,7 +700,7 @@ for (auto insertion_method: {"find_ibf_size_splitting", "naive", "find_ibf_idx_t
         }
         memory_insertion.push_back(std::get<0>(memory_time_insertion));
         time_insertion.push_back(std::get<1>(memory_time_insertion));
-        if (std::get<3>(memory_time_insertion) and not std::get<2>(memory_time_insertion)){
+        if (std::get<3>(memory_time_insertion) and not std::get<2>(memory_time_insertion)){ // better distinghuis between partial and full rebuild.  and not std::get<2>(memory_time_insertion)
             rebuilds.push_back(2); // 2 inidicates a partial rebuild.
         }else{
             rebuilds.push_back((int) std::get<2>(memory_time_insertion));
@@ -663,14 +714,15 @@ for (auto insertion_method: {"find_ibf_size_splitting", "naive", "find_ibf_idx_t
         time_query.push_back(std::get<1>(memory_time_queries));
 
         size_index.push_back(file_size(filename_index));
+    size_index_bash.push_back(file_size_bash(filename_index));
         if (counter%50==0){
             std::cout << "saving intermediate results" <<std::endl;
-                    write_to_python(python_filename + insertion_method, time_insertion, time_query, memory_insertion, memory_query, size_index, rebuilds); //  write result vectors to python file.
+                    write_to_python(python_filename + insertion_method, time_insertion, time_query, memory_insertion, memory_query, size_index, size_index_bash, rebuilds); //  write result vectors to python file.
         }
 
     }
 
-    write_to_python(python_filename + insertion_method, time_insertion, time_query, memory_insertion, memory_query, size_index, rebuilds); //  write result vectors to python file.
+    write_to_python(python_filename + insertion_method, time_insertion, time_query, memory_insertion, memory_query, size_index, size_index_bash, rebuilds); //  write result vectors to python file.
 }
 // TODO test if all files have been added. use load_hibf
 // TODO built in a better way to ensure that each insertion/query was without errors
@@ -716,7 +768,7 @@ std::tuple<int, double, bool, bool>  insert_sequences(std::string filename_ub, s
         std::cout << "[ERROR] error message detected!" <<std::flush;
         std::cin.clear(); std::cin.get(); int n; std::cin >> n;//std::exit();
     }
-    return std::make_tuple(std::get<0>(memory_time), std::get<1>(memory_time), find_rebuild(ouptut_file, "Svenja+Myrthe"), find_rebuild(ouptut_file, "Partial rebuild"));
+    return std::make_tuple(std::get<0>(memory_time), std::get<1>(memory_time), find_rebuild(ouptut_file, "Full rebuild"), find_rebuild(ouptut_file, "Partial rebuild"));
 }
 //2. Insert single bin and measure insertion time.
 
@@ -771,6 +823,7 @@ int main_insert_seq(){
 
     auto result = create_query_file(existing_filenames_building, filename_queries_existing, sample_percentage, folder);
     int number_of_files = extract_filenames(existing_filenames_building).size(); std::vector<std::string> tmp_query_filenames = std::get<1>(result);
+    std::cout << "number of lines: " << number_of_files << std::endl;
     std::vector<std::string> user_bin_filenames = extract_filenames(insertion_paths);
 
     std::string filename_index =  folder + "evaluation/tmp/" +"sequence_insertions"+ "_" +  filename_index_original;
@@ -781,12 +834,13 @@ int main_insert_seq(){
 
     // Result vectors
     std::vector<double> time_insertion, time_query, memory_insertion, memory_query;
-    std::vector<int> size_index, rebuilds;
+    std::vector<int> size_index, size_index_bash, rebuilds;
     // check time and size before updating
     auto memory_time_queries = query_all_ubs(filename_queries, filename_index, filename_executable, number_of_files, folder, tmp_query_filenames); //  measure query times
     memory_query.push_back(std::get<0>(memory_time_queries));
     time_query.push_back(std::get<1>(memory_time_queries));
     size_index.push_back(file_size(filename_index));
+    size_index_bash.push_back(file_size_bash(filename_index));
 
         system("mkdir tmp"); //
 
@@ -837,7 +891,7 @@ int main_insert_seq(){
                                folder);
         memory_insertion.push_back(std::get<0>(memory_time_insertion));
         time_insertion.push_back(std::get<1>(memory_time_insertion));
-        if (std::get<3>(memory_time_insertion)){
+        if (std::get<3>(memory_time_insertion) and not std::get<2>(memory_time_insertion)){
             rebuilds.push_back(2); // 2 inidicates a partial rebuild.
         }else{
             rebuilds.push_back((int) std::get<2>(memory_time_insertion));
@@ -847,6 +901,7 @@ int main_insert_seq(){
         time_query.push_back(std::get<1>(memory_time_queries));
 
         size_index.push_back(file_size(filename_index));
+    size_index_bash.push_back(file_size_bash(filename_index));
 
         std::remove(filename_new_sequences.c_str());         // empty the file outputFileName, such that 10 new sequences can be inserted.
         std::ofstream outputFile(filename_new_sequences);  // Open output file in append mode
@@ -856,7 +911,7 @@ int main_insert_seq(){
 
         if (lineCount%500==0){
             std::cout << "saving intermediate results" <<std::endl;
-                    write_to_python(python_filename + "_insertsequences", time_insertion, time_query, memory_insertion, memory_query, size_index, rebuilds); //  write result vectors to python file.
+                    write_to_python(python_filename + "_insertsequences", time_insertion, time_query, memory_insertion, memory_query, size_index, size_index_bash, rebuilds); //  write result vectors to python file.
         }
 
         std::ofstream outputFile(filename_new_sequences, std::ios_base::app);  // Open output file in append mode
@@ -866,7 +921,7 @@ int main_insert_seq(){
 
     inputFile.close();
 
-    write_to_python(python_filename + "_insertsequences", time_insertion, time_query, memory_insertion, memory_query, size_index, rebuilds); //  write result vectors to python file.
+    write_to_python(python_filename + "_insertsequences", time_insertion, time_query, memory_insertion, memory_query, size_index, size_index_bash, rebuilds); //  write result vectors to python file.
     std::system(("mv " + insert_to_ub + "_original " + insert_to_ub + " ").c_str() );
 
     return 0;
@@ -965,7 +1020,7 @@ int main_del_seq(){
 // UB deletion ; all of the same size.
     std::string tmp_filename = folder + "evaluation/" + tmp_folder + "/tmp_input_file.txt";
     std::vector<double> time_insertion, time_query, memory_insertion, memory_query;
-    std::vector<int> size_index, rebuilds, del_or_insert;
+    std::vector<int> size_index, size_index_bash, rebuilds, del_or_insert;
     std::string insertion_paths_copy = "evaluation/" + tmp_folder + "/insertion_paths_copy.txt ";
     system(("yes | cp -f " + insertion_paths + " " + insertion_paths_copy).c_str()); //make a copy of the file
 
@@ -996,6 +1051,7 @@ int main_del_seq(){
             memory_query.push_back(std::get<0>(memory_time_queries));
             time_query.push_back(std::get<1>(memory_time_queries));
             size_index.push_back(file_size(filename_index));
+    size_index_bash.push_back(file_size_bash(filename_index));
          }
 
 
@@ -1022,12 +1078,13 @@ int main_del_seq(){
         memory_query.push_back(std::get<0>(memory_time_queries));
         time_query.push_back(std::get<1>(memory_time_queries));
         size_index.push_back(file_size(filename_index));
+    size_index_bash.push_back(file_size_bash(filename_index));
 
 }
      }
      // expected result: rebuild after some time because merged bins grow in FPR.
      // before that, querying might take longer because of false hits. (depends on how much you query and if you insert the UBs that you deleted, how similart they are)
-     write_to_python(python_filename + "deletions", time_insertion, time_query, memory_insertion, memory_query, size_index, rebuilds); //  write result vectors to python file.
+     write_to_python(python_filename + "deletions", time_insertion, time_query, memory_insertion, memory_query, size_index, size_index_bash, rebuilds); //  write result vectors to python file.
 //TODO also write del_or_inserts to python file.
  }
 }

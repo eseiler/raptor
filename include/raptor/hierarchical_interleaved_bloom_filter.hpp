@@ -361,10 +361,13 @@ public:
      * \author Myrthe Willemsen
     */
     void update_occupancy_table(size_t const kmer_count, size_t const ibf_idx, size_t const bin_idx, size_t const number_of_bins = 1){
-        auto const occupancy_per_bin = std::max<size_t>(1, kmer_count/number_of_bins); // integer devision
-        for (size_t offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table. Perhaps do this before inserting.
-            occupancy_table[ibf_idx][bin_idx + offset] += occupancy_per_bin;
+        if (kmer_count){ // Otherwise ones are placed in the occupancy table
+            auto const occupancy_per_bin = std::max<size_t>(1, kmer_count/number_of_bins); // integer devision
+            for (size_t offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table. Perhaps do this before inserting.
+                occupancy_table[ibf_idx][bin_idx + offset] += occupancy_per_bin;
+            }
         }
+
     }
 
     /*!\brief Obtain the number of k-mers that an UB corresponding to the given filename contains.

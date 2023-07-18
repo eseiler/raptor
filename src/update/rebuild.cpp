@@ -159,7 +159,7 @@ std::vector<uint64_t> split_mb(std::tuple<size_t,size_t> index_tuple,
         else{
             assert(std::get<0>(index_tuple) < index.ibf().occupancy_table.size());
             assert(tb_idxs[split] < index.ibf().occupancy_table[ibf_idx].size());
-            index.ibf().occupancy_table[ibf_idx][tb_idxs[split]] = 1; // set some value to the occupancy table, such that not the same value is found twice
+            index.ibf().occupancy_table[ibf_idx][tb_idxs[split]] = 1000; // set some value to the occupancy table, such that not the same value is found twice
         }
     }
     for (int split = 0; split < number_of_splits; split++){             // get indices of the empty bins on the higher level IBF to serve as new merged bins.
@@ -193,10 +193,11 @@ std::vector<std::vector<std::tuple<size_t, std::string>>> split_filenames(
             cumulative_sum += std::get<0>(kmer_counts_filenames[filename_idx]);
             filename_idx += 1;
         }
+        if (split==number_of_splits-1) filename_idx = kmer_counts_filenames.size();
         split_filenames.push_back(std::vector(        // create a new vector with filename indices.
             std::ranges::next(kmer_counts_filenames.begin(), split_idx, kmer_counts_filenames.end()),  // std::ranges::next(iterator, number, bound) is the same as iterator + number, but bound: it cannot go out of range.
-            std::ranges::next(kmer_counts_filenames.begin(), filename_idx + 1, kmer_counts_filenames.end())));
-        split_idx = filename_idx;
+            std::ranges::next(kmer_counts_filenames.begin(), filename_idx , kmer_counts_filenames.end())));
+        split_idx = filename_idx ;
     }
     return split_filenames;
 }

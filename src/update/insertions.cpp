@@ -431,6 +431,7 @@ size_t find_ibf_size_splitting(size_t kmer_count, raptor_index<index_structure::
             else low -= 1;
         }
 
+
         // INSERTING IN LARGER IBFs
         // Check for the parent ibf above if there is still an empty bin such that a partial rebuild can be done,
         // If it has no space for empty bins before reaching the tmax, then check the IBFs with sizes between the original IBF and the parent IBF.
@@ -448,7 +449,6 @@ size_t find_ibf_size_splitting(size_t kmer_count, raptor_index<index_structure::
                     return ibf_idx; // this should trigger a resize and partial rebuild down the stream.
             }else{
                 auto size_parent = ibf_parent.bin_size();
-                //low = low_perfect;
                 while (low < array.size() and std::get<1>(array[low]) < size_parent ){ // and thereby low will be lower than the maximum value of the array
                     auto ibf_idx = std::get<1>(array[low]);
                     size_t start_bin_idx = find_empty_bin_idx(index, ibf_idx, update_arguments, 1); // Find empty bins.
@@ -458,7 +458,10 @@ size_t find_ibf_size_splitting(size_t kmer_count, raptor_index<index_structure::
                         low += 1;
                 }
             }
-            size_t ibf_idx = parent_ibf_idx; // would be equal to using  ibf_idx= std::get<1>(array[low]);
+            if (low < array.size()) // this also includes the case where std::get<1>(array[low]) == parent_ibf_idx, which should be the case if the parents always have larger IBF bin sizes.
+                size_t ibf_idx = std::get<1>(array[low]);
+            else
+                return ibf_idx;
         }
         return ibf_idx; // a full rebuild will be triggered.
     }
