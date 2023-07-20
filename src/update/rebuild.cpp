@@ -63,8 +63,9 @@ void full_rebuild(raptor_index<index_structure::hibf> & index,
     call_build(build_arguments, new_index, true); // The additional datastructures are therein also created
     index.ibf() = new_index.ibf(); // QUESTION: the old data is of the ibf is automatically cleaned up right?
     std::filesystem::remove_all(tmp_folder);
-    std::filesystem::create_directory(tmp_folder);
+    //std::filesystem::create_directory(tmp_folder);
 }
+
 
 bool check_tmax_rebuild(raptor_index<index_structure::hibf> & index, size_t ibf_idx,
                         update_arguments const & update_arguments){
@@ -147,7 +148,7 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
     index.ibf().user_bins.initialize_filename_position_to_ibf_bin(); // this also updates the filename_to_idx datastructure
     // remove temporary files
     std::filesystem::remove_all(tmp_folder);
-    std::filesystem::create_directory(tmp_folder);
+    //std::filesystem::create_directory(tmp_folder);
 }
 
 
