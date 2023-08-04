@@ -181,7 +181,10 @@ The preprocessing applies the same cutoffs as used in Mantis
 This means that only minimisers that occur more often than the cutoff specifies are included in the output.
 If you wish to process all minimisers, you can use `--disable-cutoffs`.
 
-### Partitioned indices
+### Dynamic indexes
+Refer to the README in the update folder. 
+
+### Partitioned indexes
 To reduce the overall memory consumption, the index can be divided into multiple (a power of two) parts.
 This can be done by passing `--parts n` to `raptor build`, where `n` is the number of parts you want to create.
 This will create `n` files, each representing one part of the index. The `--size` parameter describes the overall size
