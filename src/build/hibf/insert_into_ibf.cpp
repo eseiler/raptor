@@ -56,7 +56,7 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
         }
     }
     index.update_occupancy_table((size_t) kmers.size(), ibf_idx, start_bin_idx, number_of_bins);
-    auto fpr = index.update_fpr(ibf_idx, start_bin_idx, number_of_bins); // this should be done after updating the occupancy table.
+    index.update_fpr(ibf_idx, start_bin_idx, number_of_bins); // this should be done after updating the occupancy table.
 
 }
 

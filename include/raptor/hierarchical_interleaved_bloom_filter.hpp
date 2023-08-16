@@ -186,11 +186,10 @@ public:
      * \author Myrthe Willemsen
     */
     bool is_merged_bin(size_t ibf_idx, size_t bin_idx){
-        auto const current_filename_index = user_bins.filename_index(ibf_idx, bin_idx);
         assert(ibf_idx < next_ibf_id.size());
         assert(bin_idx < next_ibf_id[ibf_idx].size());
         if (next_ibf_id[ibf_idx][bin_idx] != (int64_t) ibf_idx and next_ibf_id[ibf_idx][bin_idx] != -1){
-            assert(current_filename_index < 0);
+            assert(user_bins.filename_index(ibf_idx, bin_idx) < 0);
             return true;
         }else{ return false;}
     }
@@ -450,7 +449,7 @@ public:
      * The table of ibf_sizes is used for one of the UB insertion methods of the dynamic HIBF.
      * \author Myrthe Willemsen
      */
-    void initialize_ibf_sizes(bool max_size=true){
+    void initialize_ibf_sizes(){
         ibf_sizes.clear();
         for (size_t ibf_idx=0; ibf_idx < ibf_vector.size(); ibf_idx++){
             ibf_sizes.push_back(std::make_tuple(ibf_max_kmers(ibf_idx), ibf_idx));
@@ -466,18 +465,17 @@ public:
      * \return number_of_bins, the number of TBs needed to store the UB.
     * \author Myrthe Willemsen
     */
-    size_t number_of_bins(size_t ibf_idx, int kmer_count){
+    size_t number_of_bins(size_t ibf_idx, size_t kmer_count){
         auto& ibf = ibf_vector[ibf_idx]; // select the IBF
-        int bin_size = ibf.bin_size();
-        int hash_funs = ibf.hash_function_count();
+        size_t bin_size = ibf.bin_size();
         // alternatively size_t number_of_bins = (kmer_counts + ibf_max_kmers(ibf_idx) - 1)/ ibf_max_kmers(ibf_idx)
-        int number_of_bins = std::ceil(kmer_count / static_cast<double>(ibf_max_kmers(ibf_idx))); // first guess without accounting for multiple testing correction
+        size_t number_of_bins = std::ceil(kmer_count / static_cast<double>(ibf_max_kmers(ibf_idx))); // first guess without accounting for multiple testing correction
         while (compute_fpr(bin_size, kmer_count, number_of_bins) > fpr_max){
             number_of_bins++;
         }
         assert(number_of_bins);
 
-        return (size_t) number_of_bins;
+        return number_of_bins;
     }
 
 
@@ -558,7 +556,7 @@ public:
         for (size_t idx{}; idx < user_bin_filenames.size(); ++idx) // repopulate `filename_to_idx` by traversing over the `user_bin_filenames` vector
         {
             std::string filename = user_bin_filenames[idx];
-            if (filename.find(".empty_bin") == -1) filename_to_idx.emplace(filename, idx); // if it is not an empty bin
+            if (filename.find(".empty_bin") == std::string::npos) filename_to_idx.emplace(filename, idx); // if it is not an empty bin
 
         }
         for (size_t ibf_idx{}; ibf_idx < ibf_bin_to_filename_position.size(); ++ibf_idx)
