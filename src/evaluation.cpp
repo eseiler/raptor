@@ -44,14 +44,14 @@ double read_time(std::string filename){
 }
 
 //!\brief Convert elapsed time string to seconds
+// https://godbolt.org/z/n5xasx955
 double convertElapsedTime(const std::string& elapsedTime) {
-    std::regex timeRegex("(\\d+):(\\d+\\.\\d+)");
+    std::regex timeRegex(R"((\d+):(\d+\.\d+))");
     std::smatch match;
     if (std::regex_match(elapsedTime, match, timeRegex) && match.size() == 3) {
-        int hours = std::stoi(match[0]); // 6:11:09elapsed
         int minutes = std::stoi(match[1]);
         double seconds = std::stod(match[2]);
-        return  hours*3600 + minutes * 60 + seconds; // check how time works. hours * 60*60
+        return minutes * 60 + seconds; // check how time works. hours * 60*60
     } else {
         std::regex timeRegex(R"((\d+):(\d+):(\d+))");
         std::smatch match;
