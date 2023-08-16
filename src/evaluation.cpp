@@ -476,7 +476,7 @@ for (auto insertion_method: {"find_ibf_size_splitting", "find_ibf_idx_traverse_b
             }
 }
         std::tuple<int, double, bool, bool> memory_time_insertion; // tuple to store the results in.
-        if (insertion_method != "naive"){
+        if (strcmp(insertion_method, "naive") != 0){
             memory_time_insertion = insert_ub(tmp_filename, filename_index,  filename_executable, sketch_directory, folder, insertion_method, tmp_folder); //  measure insertion time and memory
         }else{
             write_to_txt(existing_filenames_building, user_bin_filename);
