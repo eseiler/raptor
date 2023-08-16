@@ -67,7 +67,7 @@ void search_single(search_arguments const & arguments, index_t && index)
 
     auto worker = [&](size_t const start, size_t const end)
     {
-        auto counter = [&index]()
+        auto counter = [&index, is_ibf]()
         {
             if constexpr (is_ibf)
                 return index.ibf().template counting_agent<uint16_t>();
