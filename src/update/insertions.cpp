@@ -306,7 +306,7 @@ size_t find_ibf_idx_traverse_by_fpr(size_t & kmer_count, raptor_index<index_stru
 
     if (start_bin_idx != ibf.bin_count())
         return(ibf_idx); // if we do find empty bins, just return this IBF.
-    else if (start_bin_idx == ibf.bin_count()){ // If we can find no empty bins in the IBF, traverse down.
+    else { // If we can find no empty bins in the IBF, traverse down.
         size_t best_mb_idx = ibf.bin_count(); double best_fpr = 1; // initialize the best idx outside of the ibf, such that we can use this after the loop to check if a MB was found.
          for (size_t bin_idx=0; bin_idx < ibf.bin_count(); ++bin_idx){ //loop over bins to find the bext merged bin
             if (index.ibf().is_merged_bin(ibf_idx, bin_idx)){
