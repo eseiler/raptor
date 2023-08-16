@@ -8,9 +8,6 @@
 #include <seqan3/test/tmp_directory.hpp>
 #include <seqan3/test/tmp_filename.hpp>
 
-#include <chopper/count/execute.hpp>
-#include <chopper/layout/execute.hpp>
-
 #include "../../../include/cli_test.hpp"
 
 struct build_hibf_layout : public raptor_base
