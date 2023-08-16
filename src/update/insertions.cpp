@@ -11,7 +11,7 @@
 
 namespace raptor
 {
-
+//!\brief Calculate the new number of bins needed when resizing the IBF
 size_t new_bin_count(size_t number_of_bins, double eb_fraction, size_t ibf_bin_count){
     return chopper::next_multiple_of_64(std::max((size_t) std::round((1+eb_fraction)
         *ibf_bin_count), ibf_bin_count + number_of_bins));
@@ -19,9 +19,9 @@ size_t new_bin_count(size_t number_of_bins, double eb_fraction, size_t ibf_bin_c
 
 /*!\brief Finds a location in the HIBF for a new UB.
  * \details The algorithm finds a suitable location in the existing HIBF for a new UB, by .
- * 1) looking for a proper IBF with one of the three algorithms
+ * 1) looking for a proper IBF with one of the four algorithms
  * 2) calculating the number of TBs needed to insert the UB in this IBF
- * 3) finding the bin_idx in the
+ * 3) finding the bin_idx in the selected IBF. This might cause resizing of IBFs which may trigger rebuilds later on.
  * \param[in] kmers the set of kmers to be stored
  * \param[in] index the original HIBF
  * \return ibf_idx, bin_idx, number_of_bins An index triple of the index of IBF, start index of the technical bins, and the number of bins
@@ -39,28 +39,27 @@ std::tuple <uint64_t, uint64_t, uint16_t> get_location(size_t kmer_count, robin_
     else if (update_arguments.ibf_selection_method == "find_ibf_size_splitting")
         ibf_idx = find_ibf_size_splitting(kmers.size(), index, update_arguments);
     else if (update_arguments.ibf_selection_method == "find_ibf_idx_traverse_by_fpr"){
-        size_t ibf_idx_by_size = find_ibf_idx_traverse_by_fpr(kmer_count, index, root_idx);
+        size_t ibf_idx_by_size = find_ibf_idx_traverse_by_fpr(kmer_count, index, root_idx); // first part of the
         if (update_arguments.tmax_condition){
-            ibf_idx = find_ibf_idx_traverse_by_fpr_tmax(kmer_count, index, update_arguments, ibf_idx_by_size);
+            ibf_idx = find_ibf_idx_traverse_by_fpr_tmax(kmer_count, index, update_arguments, ibf_idx_by_size); // second part of the traversal also enters into the subtrees, where the user bin needs to be split.
             if (ibf_idx == -1)
-                ibf_idx =  ibf_idx_by_size; // in fact, we should do here a partial rebuild, adding the new filename to the subtree. Currently a rebuild is triggered because we resize beyond tmax.  TODO
+                ibf_idx =  ibf_idx_by_size; // In this case, it is more efficient to do a partial rebuild here, adding the new filename to the subtree. Currently a rebuild is triggered because we resize beyond tmax.
         }
     }
     else
         std::cout << "No correct IBF selection method was entered";
     size_t number_of_bins = 1; // calculate number of user bins needed.
     if (index.ibf().ibf_max_kmers(ibf_idx) < (size_t) kmer_count){ // when using the find_ibf_idx_ibf_size, it segfaults in the bin_size function, when size_t bin_size = ibf.bin_size() in ibf_max_kmers
-        // Only if we are at the root we might have to split bins. Delete ibf_idx==0, if using similarity method
+        // For the first two insertion methods, only if we are at the root we might have to split bins
         number_of_bins = index.ibf().number_of_bins(ibf_idx, (int) kmer_count);       // calculate among how many bins we should split
     }
     uint64_t bin_idx = find_empty_bin_idx(index, ibf_idx, update_arguments, number_of_bins);
     size_t ibf_bin_count = index.ibf().ibf_vector[ibf_idx].bin_count();
-    if (bin_idx == ibf_bin_count){ // current solution TODO
+    if (bin_idx == ibf_bin_count){ // The current solution resizes the IBF here, but it would be more efficient to check the tmax function after calculating the new bin count and perhaps trigger a partial rebuild dirctly.
         size_t new_ibf_bin_count = new_bin_count(number_of_bins, update_arguments.empty_bin_percentage, ibf_bin_count);
         std::cout << "Resize the IBF at index: " << ibf_idx << "\n" << std::flush;
         index.ibf().resize_ibf(ibf_idx, new_ibf_bin_count);
     }
-
     return {ibf_idx, bin_idx, number_of_bins};
     }
 
@@ -78,6 +77,7 @@ void update_sketch(std::vector<std::string> filename, update_arguments update_ar
         chopper::sketch::execute(layout_arguments, filename, sketches); // make sure that config.precomputed_files = false.
     }
 }
+
 /*!\brief Inserts a UB in the assigned TBs and its parent MBs in higher level IBFs
  * \details The algorithm inserts the UB in the leave bins (LBs) and parent merged bins
  * iteratively until reaching the root ibf at the top level. For each level the function
@@ -137,7 +137,6 @@ void insert_ubs(update_arguments const & update_arguments,
         }
     }
 }
-
 
 /*!\brief splits UB content over more TBs
  * \details The algorithm determines the new number of TBs to be split over, using the percentage of empty bins.
@@ -397,7 +396,17 @@ size_t find_ibf_idx_ibf_size(size_t kmer_count, raptor_index<index_structure::hi
  * \param[in] kmer_count The number of k-mers to be inserted.
  * \param[in] index The HIBF.
  * \return the IBF index to insert the new UB in.
- * \details
+ * \details The function consists of three phases
+ * The first phase is similar to that of the `find_ibf_size`, where a binary search is done on the array of IBF sizes
+ * to find an IBF with a size just large enought to accomodate the new sample without splitting it.
+ * If this IBF does not have sufficient empty bins, and already reach the t-max, then the second phase is entered.
+ * In the second phase, we check for each of the IBFs with a smaller size whether they have sufficient empty bins
+ * to insert the new user bin. If so, return the IBF index. If not, continue with the next phase.
+ * In the third phase, we check for the parent IBF above if there is still an empty bin such that a partial rebuild can
+ * be done. If it has no space for empty bins before reaching the tmax, then check the IBFs with sizes between the
+ * original IBF and the parent IBF. Should any of them have an empty bin, then insert the user bin there.
+ * If not, then repeat the process for the parent of the parent.
+ * This way, empty bins will be filled up before the next full rebuild.
  * \author Myrthe Willemsen
  */
 size_t find_ibf_size_splitting(size_t kmer_count, raptor_index<index_structure::hibf> & index,
@@ -405,6 +414,7 @@ size_t find_ibf_size_splitting(size_t kmer_count, raptor_index<index_structure::
     auto & array = index.ibf().ibf_sizes;
         int low = 0;
         int high = array.size()-1;
+        // 1. FINDING THE IBF WITH BEST SIZE
         while (low <= high) {
             int mid = (low + high) >> 1;
             assert(mid < array.size());
@@ -415,9 +425,7 @@ size_t find_ibf_size_splitting(size_t kmer_count, raptor_index<index_structure::
             else if (std::get<0>(array[mid]) == kmer_count)
                 {low = mid; break;} // exact kmer_count found
         }
-        // SPLITTING BELOW
-        // If the found IBF ha sno empty bin, then check for each of the IBFs with a smaller size whether they have
-        // sufficient empty bins to insert the new user bin. If so, return the IBF index. If not, continue with the next section.
+        // 2. EMPTY BINS IN SMALLER IBFS
         low = std::min(low, static_cast<int>(array.size())-1); // low = mid + 1, so it may happen that low equals the array.size.
         assert(low < array.size());
         auto low_perfect = low;
@@ -431,13 +439,7 @@ size_t find_ibf_size_splitting(size_t kmer_count, raptor_index<index_structure::
             else low -= 1;
         }
 
-
-        // INSERTING IN LARGER IBFs
-        // Check for the parent ibf above if there is still an empty bin such that a partial rebuild can be done,
-        // If it has no space for empty bins before reaching the tmax, then check the IBFs with sizes between the original IBF and the parent IBF.
-        // Should any of them have an empty bin, then insert the user bin there.
-        // If not, then repeat the process for the parent of the parent.
-        // This way, empty bins will be filled up before the next full rebuild.
+        // 3. EMPTY BINS IN LARGER IBFs
         low = low_perfect;
         size_t ibf_idx = std::get<1>(array[low]);
 
@@ -509,11 +511,6 @@ size_t find_ibf_idx_traverse_by_similarity(robin_hood::unordered_flat_set<size_t
         return(std::get<0>(index.ibf().previous_ibf_id[ibf_idx])); //ibf idx of merged bin a level up. If it is a root, it will automatically return the root index = 0
     }
 }
-
-
-
-
-
 
 
 

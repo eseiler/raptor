@@ -57,10 +57,9 @@ seqan3::interleaved_bloom_filter<> construct_ibf(robin_hood::unordered_flat_set<
             kmer_size += empty_bin_kmers; // in case we are initializing an IBF where the largest bin is a merged bin, we must take into account the `empty_bin_kmers` that it should be able to store after future updates, next to all its children `kmers`.
         }
     }
-
     unsigned long kmers_per_bin = static_cast<size_t>(std::ceil(static_cast<double>(kmer_size) / number_of_bins));         // For the construction of the IBF we need to calculate the length of a single bloom filter (bin size), by dividing the number of kmers of the UB by the number of bins among which it will be stored.
     double const bin_bits{static_cast<double>(bin_size_in_bits(arguments, kmers_per_bin))};
-    seqan3::bin_size const bin_size{static_cast<size_t>(std::ceil(bin_bits * data.fp_correction[number_of_bins]))};
+    seqan3::bin_size const bin_size{static_cast<size_t>(std::ceil(bin_bits * data.fp_correction[number_of_bins]))}; // TODO  std::logic_error; what():  The size of a bin must be > 0.
     seqan3::bin_count const bin_count{node_data.number_of_technical_bins};
     seqan3::interleaved_bloom_filter<> ibf{bin_count, bin_size, seqan3::hash_function_count{arguments.hash}};
 

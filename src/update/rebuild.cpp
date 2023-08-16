@@ -20,7 +20,7 @@
 namespace raptor
 {
 
-
+//!\brief helper function to create random filenames for temporary folders to save the layout in. This is to prevent multiple runs writing to the same file.
 std::string generate_random_string(int length) {
     std::string characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     std::random_device rd;
@@ -48,11 +48,11 @@ std::set<std::string> convert_to_set(std::vector<std::string> vector)
 void full_rebuild(raptor_index<index_structure::hibf> & index,
                   update_arguments const & update_arguments) {
     std::cout << "Full rebuild" << std::flush;
-    index.ibf().initialize_ibf_sizes();
-    auto original_fpr = index.ibf().fpr_max;
+    index.ibf().initialize_ibf_sizes(); // I think this is needed here to prevent assertion statements, but I am not sure.
     //0) Create layout arguments
     chopper::configuration layout_arguments = layout_config(index, update_arguments); // create the arguments to run the layout algorithm with.
     //1) Obtain kmer counts together with the filenames
+    index.ibf().ibf_vector = {}; // index.ibf().ibf_vector = std::vector<ibf_type>{}; //remove the original IBF to reduce RAM usage.
     std::vector<std::string> filenames = index.ibf().user_bins.user_bin_filenames; // all filenames
     auto kmer_counts_filenames = get_kmer_counts(index, convert_to_set(filenames));
     //2) call chopper layout on the stored filenames.
@@ -61,12 +61,19 @@ void full_rebuild(raptor_index<index_structure::hibf> & index,
     raptor_index<index_structure::hibf> new_index{}; //create the empty HIBF of the subtree.
     build_arguments build_arguments = build_config(index, layout_arguments); // create the arguments to run the build algorithm with.
     call_build(build_arguments, new_index, true); // The additional datastructures are therein also created
-    index.ibf() = new_index.ibf(); // QUESTION: the old data is of the ibf is automatically cleaned up right?
+    index.ibf() = new_index.ibf();
     std::filesystem::remove_all(tmp_folder);
-    //std::filesystem::create_directory(tmp_folder);
 }
 
 
+/*!\brief Checks if the bin count of an IBF exceeds t_max, and requires a rebuild.
+ * \details Triggers a rebuild directly from the function.
+ * \param[in] ibf_idx the location of the subtree in the HIBF
+ * \param[in] index the original HIBF
+ * \param[in] update_arguments the arguments that were passed with the update that was to be done on the HIBF.
+ * \return if a rebuild was performed.
+ * \author Myrthe
+ */
 bool check_tmax_rebuild(raptor_index<index_structure::hibf> & index, size_t ibf_idx,
                         update_arguments const & update_arguments){
     if (index.ibf().ibf_vector[ibf_idx].bin_count() > index.ibf().t_max){ // If an ibf grows out of the tolerated t_max, a full rebuild is triggered
@@ -112,7 +119,6 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
     auto kmer_counts_filenames = get_kmer_counts(index, filenames_subtree);
     //1.3) Define how to split the IBF, in terms of merged bin indexes and user bin filenames
     auto split_files = split_filenames(kmer_counts_filenames, number_of_splits);
-
     auto split_idxs = split_mb(index_tuple, index, update_arguments, number_of_splits); // returns the new indices to attach the subtree
 
     //1.5) Check the IBF bin count exceeds tmax, which might be possible if it has been resized. If tmax is exceeded, another build will be triggered inside the 'check tmax' function
@@ -148,7 +154,6 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
     index.ibf().user_bins.initialize_filename_position_to_ibf_bin(); // this also updates the filename_to_idx datastructure
     // remove temporary files
     std::filesystem::remove_all(tmp_folder);
-    //std::filesystem::create_directory(tmp_folder);
 }
 
 
@@ -295,36 +300,36 @@ chopper::configuration layout_config(raptor_index<index_structure::hibf> & index
 */
 void call_layout(std::vector<std::tuple<size_t, std::string>> kmer_counts_filenames,
                  chopper::configuration & config){ // layout_arguments
-        int exit_code{};
+    int exit_code{};
 
-        chopper::layout::layout hibf_layout{};
-        std::vector<std::string> filenames;
-        std::vector<size_t> kmer_counts;
-        for (const auto &entry: kmer_counts_filenames) { // kmer_counts_filenames is sorted decending.
-            kmer_counts.push_back(std::get<0>(entry));
-            filenames.push_back(std::get<1>(entry));
-        }
-        std::vector<bool> empty_bins; // A bitvector indicating whether a bin is empty (1) or not (0).
-        std::vector<size_t> empty_bin_cum_sizes; // The cumulative k-mer count for the first empty bin until empty bin i
-        std::vector<chopper::sketch::hyperloglog> sketches{};
+    chopper::layout::layout hibf_layout{};
+    std::vector<std::string> filenames;
+    std::vector<size_t> kmer_counts;
+    for (const auto &entry: kmer_counts_filenames) { // kmer_counts_filenames is sorted decending.
+        kmer_counts.push_back(std::get<0>(entry));
+        filenames.push_back(std::get<1>(entry));
+    }
+    std::vector<bool> empty_bins; // A bitvector indicating whether a bin is empty (1) or not (0).
+    std::vector<size_t> empty_bin_cum_sizes; // The cumulative k-mer count for the first empty bin until empty bin i
+    std::vector<chopper::sketch::hyperloglog> sketches{};
 
-        try {
-            chopper::sketch::toolbox::read_hll_files_into(config.sketch_directory, filenames, sketches); // TODO give a warning if not all sketches are found.
-            chopper::layout::insert_empty_bins(empty_bins, empty_bin_cum_sizes,
-                              kmer_counts, sketches, filenames, config);
+    try {
+        chopper::sketch::toolbox::read_hll_files_into(config.sketch_directory, filenames, sketches); // TODO make sure that, if for any sketch, it is not found, that it is created.
+        chopper::layout::insert_empty_bins(empty_bins, empty_bin_cum_sizes,
+                          kmer_counts, sketches, filenames, config);
 
-            chopper::data_store store{.false_positive_rate = config.false_positive_rate,
-                    .hibf_layout = &hibf_layout,
-                    .kmer_counts = kmer_counts,
-                    .sketches = sketches,
-                    .empty_bins = empty_bins,
-                    .empty_bin_cum_sizes = empty_bin_cum_sizes};
+        chopper::data_store store{.false_positive_rate = config.false_positive_rate,
+                .hibf_layout = &hibf_layout,
+                .kmer_counts = kmer_counts,
+                .sketches = sketches,
+                .empty_bins = empty_bins,
+                .empty_bin_cum_sizes = empty_bin_cum_sizes};
 
-            exit_code |= chopper::layout::execute(config, filenames, store);
-        }
-        catch (sharg::parser_error const &ext) {    // GCOVR_EXCL_START
-            std::cerr << "[CHOPPER ERROR] " << ext.what() << '\n';
-        }
+        exit_code |= chopper::layout::execute(config, filenames, store);
+    }
+    catch (sharg::parser_error const &ext) {    // GCOVR_EXCL_START
+        std::cerr << "[CHOPPER ERROR] " << ext.what() << '\n';
+    }
 
 }
 
@@ -392,6 +397,7 @@ void remove_ibfs(raptor_index<index_structure::hibf> & index, size_t ibf_idx){
             counter += 1;
         }
     };
+
     // Remove vectors of indices of subindex datastructures like next_ibf and previous_ibf
     remove_indices(indices_to_remove, index.ibf().ibf_vector);
     remove_indices(indices_to_remove, index.ibf().next_ibf_id);
@@ -403,8 +409,14 @@ void remove_ibfs(raptor_index<index_structure::hibf> & index, size_t ibf_idx){
         for (size_t i{0}; i < index.ibf().next_ibf_id[ibf_idx].size(); ++i){
             auto & next_ibf_idx = index.ibf().next_ibf_id[ibf_idx][i];
             if (next_ibf_idx >=0){
-                assert(static_cast<size_t>(next_ibf_idx) < indices_map.size()); // this assertion prevents an out of range segmentation fault
-                next_ibf_idx = indices_map[next_ibf_idx];
+                if (static_cast<size_t>(next_ibf_idx) >= indices_map.size())
+                    next_ibf_idx = -1;
+                else
+                //assert(static_cast<size_t>(next_ibf_idx) < indices_map.size()); // this assertion prevents an out of range segmentation fault
+                    next_ibf_idx = indices_map.at(next_ibf_idx); // TODO check another time if this goes as should
+                // easiest but not the most neat solution is to convert it to a -1.
+                //                 assert(static_cast<size_t>(next_ibf_idx) < indices_map.size()); // this assertion prevents an out of range segmentation fault
+                //                next_ibf_idx = indices_map[next_ibf_idx];
             }
         }
     }
