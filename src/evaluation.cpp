@@ -950,7 +950,7 @@ int main_del_seq(){
     auto result = create_query_file(existing_filenames_building, filename_queries_existing, folder, tmp_folder);
     system(("yes | cp -rf " + filename_queries_existing + " " + filename_queries).c_str()); //make a copy of the file
 
-    int number_of_files = extract_filenames(existing_filenames_building).size(); std::vector<std::string> tmp_query_filenames = std::get<1>(result);
+    size_t number_of_files = extract_filenames(existing_filenames_building).size(); std::vector<std::string> tmp_query_filenames = std::get<1>(result);
     std::vector<std::string> user_bin_filenames = extract_filenames(insertion_paths);
     std::string tmp_filename = folder + "evaluation/" + tmp_folder + "/tmp_input_file.txt";
     std::vector<double> time_insertion, time_query, memory_insertion, memory_query;
@@ -961,11 +961,11 @@ int main_del_seq(){
     system(("yes | cp -rf " + folder + "evaluation/" + input_test + "/" + filename_index_original + " " + filename_index).c_str()); //make a copy of the file
 
 
-    int user_bin_filenames_counter =0;
-    for (int number_of_operatons = 0; number_of_operatons < 1000; number_of_operatons++){
+    size_t user_bin_filenames_counter =0;
+    for (size_t number_of_operatons = 0; number_of_operatons < 1000; number_of_operatons++){
         if (user_bin_filenames_counter + number_of_operatons < user_bin_filenames.size()){
             std::cout <<"number of operation in the series: " << number_of_operatons << std::endl;
-    for (int _ = 0; _ < number_of_operatons; _++){
+    for (size_t _ = 0; _ < number_of_operatons; _++){
         std::cout <<"number of operation in the series: " << number_of_operatons << ", deletion: "<< _ << std::endl;
 
         std::ifstream existing_paths_opened(existing_filenames_building);
