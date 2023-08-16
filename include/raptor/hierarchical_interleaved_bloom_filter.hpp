@@ -558,7 +558,7 @@ public:
         for (size_t idx{}; idx < user_bin_filenames.size(); ++idx) // repopulate `filename_to_idx` by traversing over the `user_bin_filenames` vector
         {
             std::string filename = user_bin_filenames[idx];
-            if (filename.find(".empty_bin") == -1) filename_to_idx.emplace(filename, idx); // if it is not an empty bin
+            if (filename.find(".empty_bin") == std::string::npos) filename_to_idx.emplace(filename, idx); // if it is not an empty bin
 
         }
         for (size_t ibf_idx{}; ibf_idx < ibf_bin_to_filename_position.size(); ++ibf_idx)
