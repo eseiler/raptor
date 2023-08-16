@@ -450,7 +450,7 @@ public:
      * The table of ibf_sizes is used for one of the UB insertion methods of the dynamic HIBF.
      * \author Myrthe Willemsen
      */
-    void initialize_ibf_sizes(bool max_size=true){
+    void initialize_ibf_sizes(){
         ibf_sizes.clear();
         for (size_t ibf_idx=0; ibf_idx < ibf_vector.size(); ibf_idx++){
             ibf_sizes.push_back(std::make_tuple(ibf_max_kmers(ibf_idx), ibf_idx));
