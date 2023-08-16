@@ -72,6 +72,9 @@ if (NOT TARGET raptor)
     set(SOURCE_FILES evaluation.cpp)
     add_executable(evaluate ${SOURCE_FILES})
     target_link_libraries ("evaluate" PUBLIC "raptor_lib")
+    set(SOURCE_FILES generate_reads.cpp)
+    add_executable(generate_reads ${SOURCE_FILES})
+    target_link_libraries ("generate_reads" PUBLIC "raptor_lib")
 endif ()
 
 
