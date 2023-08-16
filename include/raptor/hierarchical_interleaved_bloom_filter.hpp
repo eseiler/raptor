@@ -186,11 +186,10 @@ public:
      * \author Myrthe Willemsen
     */
     bool is_merged_bin(size_t ibf_idx, size_t bin_idx){
-        auto const current_filename_index = user_bins.filename_index(ibf_idx, bin_idx);
         assert(ibf_idx < next_ibf_id.size());
         assert(bin_idx < next_ibf_id[ibf_idx].size());
         if (next_ibf_id[ibf_idx][bin_idx] != (int64_t) ibf_idx and next_ibf_id[ibf_idx][bin_idx] != -1){
-            assert(current_filename_index < 0);
+            assert(user_bins.filename_index(ibf_idx, bin_idx) < 0);
             return true;
         }else{ return false;}
     }
