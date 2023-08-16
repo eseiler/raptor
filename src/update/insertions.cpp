@@ -42,7 +42,7 @@ std::tuple <uint64_t, uint64_t, uint16_t> get_location(size_t kmer_count, robin_
         size_t ibf_idx_by_size = find_ibf_idx_traverse_by_fpr(kmer_count, index, root_idx); // first part of the
         if (update_arguments.tmax_condition){
             ibf_idx = find_ibf_idx_traverse_by_fpr_tmax(kmer_count, index, update_arguments, ibf_idx_by_size); // second part of the traversal also enters into the subtrees, where the user bin needs to be split.
-            if (ibf_idx == -1)
+            if (ibf_idx == static_cast<size_t>(-1))
                 ibf_idx =  ibf_idx_by_size; // In this case, it is more efficient to do a partial rebuild here, adding the new filename to the subtree. Currently a rebuild is triggered because we resize beyond tmax.
         }
     }
