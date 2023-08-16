@@ -459,7 +459,7 @@ size_t find_ibf_size_splitting(size_t kmer_count, raptor_index<index_structure::
                 }
             }
             if (low < array.size()) // this also includes the case where std::get<1>(array[low]) == parent_ibf_idx, which should be the case if the parents always have larger IBF bin sizes.
-                size_t ibf_idx = std::get<1>(array[low]); // QUESTION: `size_t ibf_idx = ...` does nothing because it create a new local variable, should it be `ibf_idx = ...` ?
+                ibf_idx = std::get<1>(array[low]);
             else
                 return ibf_idx;
         }
