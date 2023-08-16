@@ -392,7 +392,7 @@ void remove_ibfs(raptor_index<index_structure::hibf> & index, size_t ibf_idx){
     indices_to_remove.push_back(ibf_idx);
     std::vector<int> indices_map(index.ibf().ibf_vector.size(), -1);  // The map has the size in number of IBF's of the original index. Initialize with -1, such that empty bins, and the merged bins pointing to a removed IBF will have a pointer to -1.
     int counter = 0;// Initialize the result vector
-    for (int i = 0; i < index.ibf().ibf_vector.size(); i++) {
+    for (size_t i = 0; i < index.ibf().ibf_vector.size(); i++) {
         if (std::find(indices_to_remove.begin(), indices_to_remove.end(), i) == indices_to_remove.end()) {  // If the current element is not in indices_to_remove.
             indices_map[i] = counter; // Add it to the result vector, such that indices_map[i] = counter. Do not use .push_back, because that will make the list not long enough
             counter += 1;
