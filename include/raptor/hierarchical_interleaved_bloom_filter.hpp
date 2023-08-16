@@ -466,18 +466,17 @@ public:
      * \return number_of_bins, the number of TBs needed to store the UB.
     * \author Myrthe Willemsen
     */
-    size_t number_of_bins(size_t ibf_idx, int kmer_count){
+    size_t number_of_bins(size_t ibf_idx, size_t kmer_count){
         auto& ibf = ibf_vector[ibf_idx]; // select the IBF
-        int bin_size = ibf.bin_size();
-        int hash_funs = ibf.hash_function_count();
+        size_t bin_size = ibf.bin_size();
         // alternatively size_t number_of_bins = (kmer_counts + ibf_max_kmers(ibf_idx) - 1)/ ibf_max_kmers(ibf_idx)
-        int number_of_bins = std::ceil(kmer_count / static_cast<double>(ibf_max_kmers(ibf_idx))); // first guess without accounting for multiple testing correction
+        size_t number_of_bins = std::ceil(kmer_count / static_cast<double>(ibf_max_kmers(ibf_idx))); // first guess without accounting for multiple testing correction
         while (compute_fpr(bin_size, kmer_count, number_of_bins) > fpr_max){
             number_of_bins++;
         }
         assert(number_of_bins);
 
-        return (size_t) number_of_bins;
+        return number_of_bins;
     }
 
 
