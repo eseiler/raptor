@@ -256,6 +256,7 @@ std::tuple<int, double, bool, bool>  rebuild_index(std::string filename_ub, std:
                                                                " --output-filename " + layout_file +
                                                                " --update-UBs 0 " + // no empty bins should be included in the naive method.
                                                                " --output-sketches-to "  + folder + "chopper_sketch_sketches " +
+                                                               //" --threads " +  std::to_string(query_threads) + // TODO add threads
                                                                " --kmer-size " +  std::to_string(kmer_size); //--tmax 64
 
     std::string ouptut_file = folder + "evaluation/" + tmp_folder + "/rebuild_output.txt";

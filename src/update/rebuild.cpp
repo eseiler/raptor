@@ -345,6 +345,7 @@ build_arguments build_config(raptor_index<index_structure::hibf> & index,
     build_arguments.fpr = layout_arguments.false_positive_rate;
     build_arguments.is_hibf = true;
     build_arguments.bin_file = layout_arguments.output_filename;
+    build_arguments.threads = layout_arguments.threads;
     return build_arguments;
 }
 
