@@ -43,7 +43,7 @@ void raptor_update(update_arguments & arguments)
 
         }
         // if arguments.compressed, it should be compressed again
-        if (index.shape().size() < 0){
+        if (index.shape().empty()){
         //    assert(arguments.shape.size() > 0);
         //    assert(arguments.shape.count() > 0);
         //    index.shape() = arguments.shape;
