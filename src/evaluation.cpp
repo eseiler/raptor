@@ -11,7 +11,7 @@ const extern int kmer_size = 20; // For simulated data, use 32, for simulated da
 const extern int window_size = kmer_size;
 const extern double fpr = 0.05;
 const extern int num_hash_functions = 2;
-const extern int query_threads = 32;
+const extern int threads = 32;
 const extern int query_errors = 2;
 const extern bool generate_reads = true;
 const extern int number_of_reads = 1000000;
@@ -225,6 +225,7 @@ std::tuple<int, double, bool, bool>  insert_ub(std::string filename_ub, std::str
                                     " --sketch-directory " + sketch_directory +
                                     " --insertion-method " + insertion_method +
                                     " --sequence-similarity " +
+                                    " --threads " +  std::to_string(threads) + //  add threads
                                     " --output " +  filename_index;
     std::string ouptut_file = folder + "evaluation/" + tmp_folder+"/" + "insertion_output.txt"; // store any output that would otherwise be written to the terminal.
     auto memory_time = execute_command(ouptut_file, command);
@@ -249,6 +250,7 @@ std::tuple<int, double, bool, bool>  rebuild_index(std::string filename_ub, std:
     std::string command_build = filename_executable + " build --fpr " +std::to_string(fpr) +
                                                       " --kmer "  + std::to_string(kmer_size) +
                                                       " --window " + std::to_string(window_size) +
+                                                      " --threads " +  std::to_string(threads) + //  add threads
                                                       " --hibf --output " + filename_index + " " + layout_file;
     std::string command_layout = filename_executable_chopper + " --num-hash-functions " + std::to_string(num_hash_functions) +
                                                                " --false-positive-rate " + std::to_string(fpr) +
@@ -256,7 +258,7 @@ std::tuple<int, double, bool, bool>  rebuild_index(std::string filename_ub, std:
                                                                " --output-filename " + layout_file +
                                                                " --update-UBs 0 " + // no empty bins should be included in the naive method.
                                                                " --output-sketches-to "  + folder + "chopper_sketch_sketches " +
-                                                               //" --threads " +  std::to_string(query_threads) + // TODO add threads
+                                                               " --threads " +  std::to_string(threads) + //  add threads
                                                                " --kmer-size " +  std::to_string(kmer_size); //--tmax 64
 
     std::string ouptut_file = folder + "evaluation/" + tmp_folder + "/rebuild_output.txt";
@@ -290,7 +292,7 @@ std::tuple<int, double>  query_all_ubs(std::string filename_queries, std::string
                               " --index " + filename_index +
                               " --fpr "  +  std::to_string(fpr) +
                               " --query " + filename_queries + // must be a fastq (or a fasta?)  file with all multiple sequences.
-                              " --threads " +  std::to_string(query_threads) +
+                              " --threads " +  std::to_string(threads) +
                               " --time --output " + filename_ouptut;// include threads if possible?
         auto memory_time = execute_command(folder + "evaluation/"+ tmp_folder + "/" + "query_output.txt", command);
         if (find_rebuild(filename_ouptut, "rror")){
@@ -414,7 +416,7 @@ int main_insert_ub(){
     config << "window_size: " << window_size <<std::endl;
     config << "fpr: " << fpr <<std::endl;
     config << "num_hash_functions: " << num_hash_functions <<std::endl;
-    config << "query_threads: " << query_threads <<std::endl;
+    config << "threads: " << threads <<std::endl;
     config << "query_errors: " << query_errors <<std::endl;
     config << "generate_reads: " << generate_reads <<std::endl;
     config << "number_of_reads: " << number_of_reads <<std::endl;
@@ -523,18 +525,19 @@ std::tuple<int, double, bool, bool>  insert_sequences(std::string filename_ub, s
                                    std::string filename_executable, std::string sketch_directory,
                                    std::string folder, std::string tmp_folder = "tmp"){
     std::string command = filename_executable +
-                            " update " +
-                        " --hibf --insert-sequences" +
-                        " --input " +
-                          filename_index +
-                          " --bins " +
-                            filename_ub +
-                            " --sketch-directory " +
-                            sketch_directory +
-                            " --sequence-similarity " +
-                            " --empty-bin-sampling 0.1 " + // some empty bins to aid partial rebuilds.
-                          " --output " +
-                          filename_index;
+                                        " update " +
+                                        " --hibf --insert-sequences" +
+                                        " --input " +
+                                        filename_index +
+                                        " --bins " +
+                                        filename_ub +
+                                        " --sketch-directory " +
+                                        sketch_directory +
+                                        " --sequence-similarity " +
+                                        " --threads " +  std::to_string(threads) + //  add threads
+                                        " --empty-bin-sampling 0.1 " + // some empty bins to aid partial rebuilds.
+                                        " --output " +
+                                        filename_index;
     //--insert_sequence_appendix. By default the ending is "_insertsequences". It is the responsibility of the user to update the fasta files themselves, such as by using the concatenate cat command.
     //  a list of their filenames through the paremeter --bins
 
@@ -872,15 +875,16 @@ std::tuple<int, double, bool> delete_ub(std::string filename_ub, std::string fil
                                    std::string folder,  std::string tmp_folder){
     std::string command = filename_executable +
                             " update " +
-                        " --hibf --delete-UBs" +
-                        " --input " +
-                          filename_index +
-                          " --bins " +
-                            filename_ub +
+                            " --hibf --delete-UBs" +
+                            " --input " +
+                            filename_index +
+                            " --bins " +
+                            filename_ub + 
+                            " --threads " +  std::to_string(threads) + //  add threads
                             " --sequence-similarity " +
                             " --empty-bin-sampling 0.1 " + // some empty bins to aid partial rebuilds.
-                          " --output " +
-                          filename_index;
+                            " --output " +
+                            filename_index;
 
     std::string insert_sequence_appendix = "_insertsequences";
     std::string ouptut_file = folder + "evaluation/" + tmp_folder + "/" + "deletion_output.txt";
@@ -928,7 +932,7 @@ int main_del_seq(){
     config << "window_size: " << window_size <<std::endl;
     config << "fpr: " << fpr <<std::endl;
     config << "num_hash_functions: " << num_hash_functions <<std::endl;
-    config << "query_threads: " << query_threads <<std::endl;
+    config << "threads: " << threads <<std::endl;
     config << "query_errors: " << query_errors <<std::endl;
     config << "generate_reads: " << generate_reads <<std::endl;
     config << "number_of_reads: " << number_of_reads <<std::endl;
