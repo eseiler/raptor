@@ -998,7 +998,7 @@ int main_del_seq(){
     memory_query.push_back(std::get<0>(memory_time_queries));
     time_query.push_back(std::get<1>(memory_time_queries));
 
-    for (int _ = 0; _ < number_of_operatons; _++){
+    for (size_t _ = 0; _ < number_of_operatons; _++){
         std::string user_bin_filename = user_bin_filenames[user_bin_filenames_counter];
          user_bin_filenames_counter +=1;
 
@@ -1037,6 +1037,7 @@ int main_del_seq(){
      write_to_python(result_folder + "deletions", time_insertion, time_query, memory_insertion, memory_query, size_index, size_index_bash, rebuilds); //  write result vectors to python file.
 //TODO also write del_or_inserts to python file.
  }
+ return 0;
 }
 
 
