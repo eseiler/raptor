@@ -50,7 +50,8 @@ seqan3::interleaved_bloom_filter<> construct_ibf(robin_hood::unordered_flat_set<
         auto const & filename = record.filenames[0];
         std::string kmer_count = (std::string) std::filesystem::path(filename).stem(); // the empty bin's intended size will be extracted from the filename
         kmer_size = ::atof(kmer_count.c_str()); // Perhaps it would be better to take the size from the next UB, to ensure that it is not larger than the HLL size estimate, which could cause ver unnesessary rebuilding.
-        empty_bin_kmers += static_cast<size_t>(kmer_size); // the empty bin's size is added to `empty_bin_kmers`, which is to be passed on to the parent merged bins of the empty bin.
+    	if (kmer_size == 0) kmer_size =100;
+    	empty_bin_kmers += static_cast<size_t>(kmer_size); // the empty bin's size is added to `empty_bin_kmers`, which is to be passed on to the parent merged bins of the empty bin.
     } else { // normal or merged bin
         kmer_size = static_cast<double> (kmers.size());
         if (merged_bin){ // merged bin

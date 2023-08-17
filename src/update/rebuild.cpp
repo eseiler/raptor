@@ -117,7 +117,7 @@ void partial_rebuild(std::tuple<size_t,size_t> index_tuple,
     auto filenames_subtree = index.ibf().filenames_children(next_ibf_idx);
     //1.2) Obtain the kmer counts
     auto kmer_counts_filenames = get_kmer_counts(index, filenames_subtree);
-    //1.3) Define how to split the IBF, in terms of merged bin indexes and user bin filenames
+    //1.3) Define how to split te IBF, in terms of merged bin indexes and user bin filenames
     auto split_files = split_filenames(kmer_counts_filenames, number_of_splits);
     auto split_idxs = split_mb(index_tuple, index, update_arguments, number_of_splits); // returns the new indices to attach the subtree
 
@@ -246,7 +246,8 @@ std::vector<std::tuple<size_t, std::string>> get_kmer_counts(raptor_index<index_
         {
             int const kmer_count = index.ibf().get_occupancy_file(filename);
             kmer_counts_filenames.push_back(std::make_tuple(kmer_count, filename));
-        }
+    	    std::cout << "filename, kmer_count: " << filename << ", " << kmer_count <<std::endl;
+    	}
     }
     std::ranges::sort(kmer_counts_filenames); //  std::ranges::sort(kmer_counts_filenames, std::ranges::greater);
     std::reverse(kmer_counts_filenames.begin(), kmer_counts_filenames.end());

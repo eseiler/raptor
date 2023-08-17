@@ -385,7 +385,8 @@ public:
         for (size_t offset=0; offset < number_of_bins; offset++){ // update FPR table and occupancy=#kmer table. Perhaps do this before inserting.
             occupancy_per_file += occupancy_table[ibf_idx][bin_idx + offset];
         }
-        return occupancy_per_file;
+	std::cout << "filename, index_triple, occupancy first index: " << filename <<", " << ibf_idx << "; " << bin_idx << ";" << number_of_bins << ", " <<occupancy_table[ibf_idx][bin_idx] <<std::endl; 
+	return occupancy_per_file;
     }
 
     /*!\brief Resizes an IBF in the `ibf_vector` and the supporting tables.
