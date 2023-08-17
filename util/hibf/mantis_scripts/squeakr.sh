@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # --------------------------------------------------------------------------------------------------
-# Copyright (c) 2006-2022, Knut Reinert & Freie Universität Berlin
-# Copyright (c) 2016-2022, Knut Reinert & MPI für molekulare Genetik
+# Copyright (c) 2006-2023, Knut Reinert & Freie Universität Berlin
+# Copyright (c) 2016-2023, Knut Reinert & MPI für molekulare Genetik
 # This file may be used, modified and/or redistributed under the terms of the 3-clause BSD-License
 # shipped with this file and also available at: https://github.com/seqan/raptor/blob/main/LICENSE.md
 # --------------------------------------------------------------------------------------------------
@@ -11,6 +11,7 @@ SCRIPT_ROOT=$(dirname $(readlink -f $0))
 source $SCRIPT_ROOT/variables.sh
 
 run_squeakr () {
+    local FASTQ="$1"
     $SQUEAKR_BINARY count \
         -e \
         -k $K \
@@ -21,13 +22,6 @@ run_squeakr () {
         ${FASTQ}
 }
 
-for start in $(seq 0 32 $((BIN_NUMBER-1))); do
-    pidlist=""
-    for FASTQ in $(seq -f "$WORKING_DIRECTORY/bins/bin_%0${#BIN_NUMBER}.0f.fastq" $start 1 $((start+31))); do
-        run_squeakr & pidlist="$pidlist $!"
-    done
-    for job in $pidlist; do
-        wait $job
-    done
-done
-
+while IFS= read -r FASTA; do
+        run_squeakr "$WORKING_DIRECTORY/bins/$(basename "${FASTA}" .fna).fastq"
+done < <(cat "$INSERTION_FILES" "$EXISTING_FILES")

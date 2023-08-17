@@ -15,6 +15,7 @@
 #include <chopper/layout/insert_empty_bins.hpp>
 #include <chopper/next_multiple_of_64.hpp>
 #include <random>
+#include "chopper/sketch/execute.hpp"
 
 
 namespace raptor
@@ -315,7 +316,13 @@ void call_layout(std::vector<std::tuple<size_t, std::string>> kmer_counts_filena
     std::vector<chopper::sketch::hyperloglog> sketches{};
 
     try {
-        chopper::sketch::toolbox::read_hll_files_into(config.sketch_directory, filenames, sketches); // TODO make sure that, if for any sketch, it is not found, that it is created.
+        try{
+            chopper::sketch::toolbox::read_hll_files_into(config.sketch_directory, filenames, sketches); // TODO add 'config' as last argument to  make sure that, if for any sketch, it is not found, that it is created.
+        } catch (...) { //temporary alternative solution until chopper code is re-ran.
+            std::vector<chopper::sketch::hyperloglog> sketches{};
+            chopper::sketch::execute(config, filenames, sketches);
+        }
+
         chopper::layout::insert_empty_bins(empty_bins, empty_bin_cum_sizes,
                           kmer_counts, sketches, filenames, config);
 
