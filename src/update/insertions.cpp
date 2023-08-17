@@ -450,7 +450,7 @@ size_t find_ibf_size_splitting(size_t kmer_count, raptor_index<index_structure::
             }else{
                 auto size_parent = ibf_parent.bin_size();
                 while (low < array.size() and std::get<1>(array[low]) < size_parent ){ // and thereby low will be lower than the maximum value of the array
-                    auto ibf_idx = std::get<1>(array[low]);
+                    ibf_idx = std::get<1>(array[low]);
                     size_t start_bin_idx = find_empty_bin_idx(index, ibf_idx, update_arguments, 1); // Find empty bins.
                     if (start_bin_idx != index.ibf().ibf_vector[ibf_idx].bin_count())
                         return ibf_idx; // if we do find empty bins, just return this IBF.
