@@ -48,11 +48,15 @@ std::tuple <uint64_t, uint64_t, uint16_t> get_location(size_t kmer_count, robin_
     }
     else
         std::cout << "No correct IBF selection method was entered";
+    std::cout << "get location 2" <<std::endl <<std::flush;
+
     size_t number_of_bins = 1; // calculate number of user bins needed.
     if (index.ibf().ibf_max_kmers(ibf_idx) < (size_t) kmer_count){ // when using the find_ibf_idx_ibf_size, it segfaults in the bin_size function, when size_t bin_size = ibf.bin_size() in ibf_max_kmers
         // For the first two insertion methods, only if we are at the root we might have to split bins
         number_of_bins = index.ibf().number_of_bins(ibf_idx, (int) kmer_count);       // calculate among how many bins we should split
     }
+        std::cout << "get location 3" <<std::endl <<std::flush;
+
     uint64_t bin_idx = find_empty_bin_idx(index, ibf_idx, update_arguments, number_of_bins);
     size_t ibf_bin_count = index.ibf().ibf_vector[ibf_idx].bin_count();
     if (bin_idx == ibf_bin_count){ // The current solution resizes the IBF here, but it would be more efficient to check the tmax function after calculating the new bin count and perhaps trigger a partial rebuild dirctly.
@@ -60,6 +64,7 @@ std::tuple <uint64_t, uint64_t, uint16_t> get_location(size_t kmer_count, robin_
         std::cout << "Resize the IBF at index: " << ibf_idx << "\n" << std::flush;
         index.ibf().resize_ibf(ibf_idx, new_ibf_bin_count);
     }
+    std::cout << "get location 4" <<std::endl <<std::flush;
     return {ibf_idx, bin_idx, number_of_bins};
     }
 
@@ -374,7 +379,7 @@ uint64_t find_empty_bin_idx(raptor_index<index_structure::hibf> & index, size_t 
 size_t find_ibf_idx_ibf_size(size_t kmer_count, raptor_index<index_structure::hibf> & index){
     auto & array = index.ibf().ibf_sizes;
         int low = 0;
-        int high = array.size()-1;
+        int high = array.size()-1; // this has to be an integer, as it is allowed to become -1.
         while (low <= high) {
             int mid = (low + high) >> 1;
             assert(mid < array.size());
@@ -412,11 +417,13 @@ size_t find_ibf_size_splitting(size_t kmer_count, raptor_index<index_structure::
                                update_arguments const update_arguments){
     auto & array = index.ibf().ibf_sizes;
     assert(!array.empty());
-        size_t low = 0;
-        size_t high = array.size()-1;
+    int low = 0; // should be integers, because high is allowed to become -1.
+    int high = array.size()-1;
+    std::cout << "splitting 1" <<std::endl <<std::flush;
+    std::cout << "array size " << array.size() <<std::endl <<std::flush;
         // 1. FINDING THE IBF WITH BEST SIZE
         while (low <= high) {
-            size_t mid = (low + high) >> 1;
+            int mid = (low + high) >> 1; // takes the middle value of low and high, rounded up.
             assert(mid < array.size());
             if (std::get<0>(array[mid]) < kmer_count)
                 {low = mid + 1;}
@@ -425,20 +432,25 @@ size_t find_ibf_size_splitting(size_t kmer_count, raptor_index<index_structure::
             else if (std::get<0>(array[mid]) == kmer_count)
                 {low = mid; break;} // exact kmer_count found
         }
+        std::cout << "splitting 2" <<std::endl <<std::flush;
+
         // 2. EMPTY BINS IN SMALLER IBFS
-        size_t size_array_idx = std::min<size_t>(low, array.size()-1); // low = mid + 1, so it may happen that low equals the array.size.
+        size_t size_array_idx = std::min<size_t>((size_t) low, array.size()-1); // low = mid + 1, so it may happen that low equals the array.size.
         assert(size_array_idx < array.size());
         auto size_array_idx_perfect = size_array_idx; // index in the size_array of the 'perfect' IBF, which is just large enough to fit the new user bin.
-        while (size_array_idx >= 0)
+        while (true)
         {
             auto ibf_idx = std::get<1>(array[size_array_idx]);
             auto& ibf = index.ibf().ibf_vector[ibf_idx]; //  select the IBF
             auto number_of_bins = index.ibf().number_of_bins(ibf_idx, (int) kmer_count);       // calculate among how many bins we should split
             size_t start_bin_idx = find_empty_bin_idx(index, ibf_idx, update_arguments, number_of_bins); // Find empty bins.
+            std::cout << "splitting 2 loop" <<std::endl <<std::flush;
             if (start_bin_idx + number_of_bins <= ibf.bin_count())
                 return ibf_idx; // if we do find empty bins, just return this IBF.
-            else low -= 1;
+            else if (size_array_idx == 0) break;
+            else size_array_idx -= 1;
         }
+        std::cout << "splitting 3" <<std::endl <<std::flush;
 
         // 3. EMPTY BINS IN LARGER IBFs
         size_array_idx = size_array_idx_perfect;  // return to the 'perfect' ibf.
@@ -447,6 +459,7 @@ size_t find_ibf_size_splitting(size_t kmer_count, raptor_index<index_structure::
         while (ibf_idx){ // while the ibf is not the root.
             size_t parent_ibf_idx = std::get<0>(index.ibf().previous_ibf_id[ibf_idx]);
             auto ibf_parent = index.ibf().ibf_vector[parent_ibf_idx];
+            std::cout << "splitting 3 loop" <<std::endl <<std::flush;
             if (find_empty_bin_idx(index, parent_ibf_idx, update_arguments, 1)
                 != ibf_parent.bin_count()){ // the parent has at least one empty bin, which should accomodate a partial rebuild.
                     return ibf_idx; // this should trigger a resize and partial rebuild down the stream.
