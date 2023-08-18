@@ -113,7 +113,6 @@ std::tuple <uint64_t, uint64_t> insert_tb_and_parents(robin_hood::unordered_flat
 void insert_ubs(update_arguments const & update_arguments,
                 raptor_index<index_structure::hibf> & index){
     for  (auto &filename: update_arguments.bin_path){ // Loop over new bins, using arguments.bin_path, as created in parse_bin_path(arguments) in upgrade_parsing.cpp
-        std::cout << "Exists filename method \n";
         if (index.ibf().user_bins.exists_filename(filename[0])){ // Find location of existing user bin, inserts it if it does not exist yet.
             std::cout << "The user bin ... that you want to insert does already exist. Please use the --insert-sequences option";
         }else{
@@ -427,19 +426,23 @@ size_t find_ibf_size_splitting(size_t kmer_count, raptor_index<index_structure::
                 {low = mid; break;} // exact kmer_count found
         }
         // 2. EMPTY BINS IN SMALLER IBFS
-        low = std::min<size_t>(low, array.size()-1); // low = mid + 1, so it may happen that low equals the array.size.
-        assert(low < array.size());
+        size_t size_array_idx = std::min<size_t>(low, array.size()-1); // low = mid + 1, so it may happen that low equals the array.size.
+        assert(size_array_idx < array.size());
+        auto size_array_idx_perfect = size_array_idx; // index in the size_array of the 'perfect' IBF, which is just large enough to fit the new user bin.
+        while (size_array_idx >= 0)
         {
-            auto ibf_idx = std::get<1>(array[low]);
+            auto ibf_idx = std::get<1>(array[size_array_idx]);
             auto& ibf = index.ibf().ibf_vector[ibf_idx]; //  select the IBF
             auto number_of_bins = index.ibf().number_of_bins(ibf_idx, (int) kmer_count);       // calculate among how many bins we should split
             size_t start_bin_idx = find_empty_bin_idx(index, ibf_idx, update_arguments, number_of_bins); // Find empty bins.
             if (start_bin_idx + number_of_bins <= ibf.bin_count())
                 return ibf_idx; // if we do find empty bins, just return this IBF.
+            else low -= 1;
         }
 
         // 3. EMPTY BINS IN LARGER IBFs
-        size_t ibf_idx = std::get<1>(array[low]);
+        size_array_idx = size_array_idx_perfect;  // return to the 'perfect' ibf.
+        size_t ibf_idx = std::get<1>(array[size_array_idx]);
 
         while (ibf_idx){ // while the ibf is not the root.
             size_t parent_ibf_idx = std::get<0>(index.ibf().previous_ibf_id[ibf_idx]);
@@ -449,17 +452,17 @@ size_t find_ibf_size_splitting(size_t kmer_count, raptor_index<index_structure::
                     return ibf_idx; // this should trigger a resize and partial rebuild down the stream.
             }else{
                 auto size_parent = ibf_parent.bin_size();
-                while (low < array.size() and std::get<1>(array[low]) < size_parent ){ // and thereby low will be lower than the maximum value of the array
-                    ibf_idx = std::get<1>(array[low]);
+                while (size_array_idx < array.size() and std::get<1>(array[size_array_idx]) < size_parent ){ // and thereby size_array_idx will be size_array_idxer than the maximum value of the array
+                    ibf_idx = std::get<1>(array[size_array_idx]);
                     size_t start_bin_idx = find_empty_bin_idx(index, ibf_idx, update_arguments, 1); // Find empty bins.
                     if (start_bin_idx != index.ibf().ibf_vector[ibf_idx].bin_count())
                         return ibf_idx; // if we do find empty bins, just return this IBF.
                     else
-                        low += 1;
+                        size_array_idx += 1;
                 }
             }
-            if (low < array.size()) // this also includes the case where std::get<1>(array[low]) == parent_ibf_idx, which should be the case if the parents always have larger IBF bin sizes.
-                ibf_idx = std::get<1>(array[low]);
+            if (size_array_idx < array.size()) // this also includes the case where std::get<1>(array[size_array_idx]) == parent_ibf_idx, which should be the case if the parents always have larger IBF bin sizes.
+                ibf_idx = std::get<1>(array[size_array_idx]);
             else
                 return ibf_idx;
         }
