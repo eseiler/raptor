@@ -13,10 +13,10 @@
 #pragma once
 
 #include <seqan3/io/sequence_file/input.hpp>
-#include <seqan3/search/views/minimiser_hash.hpp>
 
 #include <raptor/adjust_seed.hpp>
 #include <raptor/dna4_traits.hpp>
+#include <raptor/syncmer.hpp>
 
 namespace raptor
 {
@@ -42,10 +42,8 @@ public:
     file_reader & operator=(file_reader &&) = default;
     ~file_reader() = default;
 
-    explicit file_reader(seqan3::shape const shape, uint32_t const window_size) :
-        minimiser_view{seqan3::views::minimiser_hash(shape,
-                                                     seqan3::window_size{window_size},
-                                                     seqan3::seed{adjust_seed(shape.count())})}
+    explicit file_reader(seqan3::shape const, uint32_t const) :
+        syncmer_view{seqan3::views::syncmer({.kmer_size = 22, .smer_size = 12, .offset = 2})}
     {}
 
     template <std::output_iterator<uint64_t> it_t>
@@ -60,7 +58,7 @@ public:
     {
         sequence_file_t fin{filename};
         for (auto && record : fin)
-            std::ranges::copy(record.sequence() | minimiser_view, target);
+            std::ranges::copy(record.sequence() | syncmer_view, target);
     }
 
     template <std::output_iterator<uint64_t> it_t>
@@ -75,7 +73,7 @@ public:
     {
         sequence_file_t fin{filename};
         for (auto && record : fin)
-            std::ranges::copy_if(record.sequence() | minimiser_view, target, pred);
+            std::ranges::copy_if(record.sequence() | syncmer_view, target, pred);
     }
 
     void on_hash(std::vector<std::string> const & filenames, auto && callback) const
@@ -88,7 +86,7 @@ public:
     {
         sequence_file_t fin{filename};
         for (auto && record : fin)
-            callback(record.sequence() | minimiser_view);
+            callback(record.sequence() | syncmer_view);
     }
 
     void for_each_hash(std::vector<std::string> const & filenames, auto && callback) const
@@ -101,13 +99,13 @@ public:
     {
         sequence_file_t fin{filename};
         for (auto && record : fin)
-            std::ranges::for_each(record.sequence() | minimiser_view, callback);
+            std::ranges::for_each(record.sequence() | syncmer_view, callback);
     }
 
 private:
     using sequence_file_t = seqan3::sequence_file_input<dna4_traits, seqan3::fields<seqan3::field::seq>>;
-    using view_t = decltype(seqan3::views::minimiser_hash(seqan3::shape{}, seqan3::window_size{}, seqan3::seed{}));
-    view_t minimiser_view = seqan3::views::minimiser_hash(seqan3::shape{}, seqan3::window_size{}, seqan3::seed{});
+    using view_t = decltype(seqan3::views::syncmer({.kmer_size = 22, .smer_size = 12, .offset = 2}));
+    view_t syncmer_view = seqan3::views::syncmer({.kmer_size = 22, .smer_size = 12, .offset = 2});
 };
 
 template <>
