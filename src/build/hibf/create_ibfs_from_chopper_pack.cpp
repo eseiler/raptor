@@ -7,6 +7,8 @@
 
 #include <lemon/list_graph.h> /// Must be first include.
 
+#include <chopper/layout/compute_fp_correction.hpp>
+
 #include <raptor/build/hibf/create_ibfs_from_chopper_pack.hpp>
 #include <raptor/build/hibf/hierarchical_build.hpp>
 #include <raptor/build/hibf/read_chopper_pack_file.hpp>
@@ -15,23 +17,36 @@ namespace raptor::hibf
 {
 
 template <seqan3::data_layout data_layout_mode>
-void create_ibfs_from_chopper_pack(build_data<data_layout_mode> & data, build_arguments const & arguments)
+robin_hood::unordered_flat_set<size_t> create_ibfs_from_chopper_pack(build_data<data_layout_mode> & data, build_arguments const & arguments, bool is_root)
 {
     read_chopper_pack_file(data, arguments.bin_file);
     lemon::ListDigraph::Node root = data.ibf_graph.nodeFromId(0); // root node = high level IBF node
     robin_hood::unordered_flat_set<size_t> root_kmers{};
 
     size_t const t_max{data.node_map[root].number_of_technical_bins};
-    data.compute_fp_correction(t_max, arguments.hash, arguments.fpr);
+    data.fp_correction = chopper::layout::compute_fp_correction(arguments.fpr, arguments.hash, t_max);
+    // Prepare index with data structures to allow for updates
+    data.hibf.fpr_max = arguments.fpr; // This parameter is added here as member to the HIBF datastructure, such that they will be stored and can be used during search or updating. Note: `window_size`, `compressed`, `parts`,  `bin_path` and `shape` stored as part of the `index` datastructure. `kmer_size` could be obtained from `shape`,
+    data.hibf.t_max = t_max;
+    data.hibf.k = arguments.kmer_size;
+    data.hibf.compute_minimiser = arguments.compute_minimiser;
+    data.hibf.num_hash_functions = arguments.hash;
 
-    hierarchical_build(root_kmers, root, data, arguments, true);
+    size_t empty_bin_kmers=0;
+    hierarchical_build(root_kmers, root, data, arguments, is_root, empty_bin_kmers);
+
+    data.hibf.user_bins.initialize_filename_position_to_ibf_bin();
+    data.hibf.initialize_previous_ibf_id();
+    data.hibf.initialize_ibf_sizes();
+
+    return root_kmers; // this is used when rebuilding, to insert into the parent merged bin.
 }
 
-template void
+template robin_hood::unordered_flat_set<size_t>
 create_ibfs_from_chopper_pack<seqan3::data_layout::uncompressed>(build_data<seqan3::data_layout::uncompressed> &,
-                                                                 build_arguments const &);
-template void
+                                                                 build_arguments const &, bool is_root);
+template robin_hood::unordered_flat_set<size_t>
 create_ibfs_from_chopper_pack<seqan3::data_layout::compressed>(build_data<seqan3::data_layout::compressed> &,
-                                                               build_arguments const & arguments);
+                                                               build_arguments const & arguments, bool is_root);
 
 } // namespace raptor::hibf

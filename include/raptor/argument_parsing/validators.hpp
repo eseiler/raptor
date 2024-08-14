@@ -12,6 +12,7 @@
 #include <seqan3/io/sequence_file/input.hpp>
 
 #include <raptor/strong_types.hpp>
+#include <string.h>
 
 namespace raptor::detail
 {
@@ -168,18 +169,19 @@ public:
         for (std::vector<std::string> const & vector_of_paths : values)
         {
             for (std::string const & value : vector_of_paths)
-            {
-                std::filesystem::path const file_path{value};
+            {   if (std::filesystem::path(value).extension() !=".empty_bin"){ //myrthe (value.substr(std::max(0,int(value.size()-10)), value.size()) != ".empty_bin")
+                    std::filesystem::path const file_path{value};
 
-                if (is_minimiser_input && (file_path.extension() != ".minimiser"))
-                    throw sharg::validation_error{"You cannot mix sequence and minimiser files as input."};
-                if (std::filesystem::file_size(file_path) == 0u)
-                    throw sharg::validation_error{"The file " + value + " is empty."};
+                    if (is_minimiser_input && (file_path.extension() != ".minimiser"))
+                        throw sharg::validation_error{"You cannot mix sequence and minimiser files as input."};
+                    if (std::filesystem::file_size(file_path) == 0u)
+                        throw sharg::validation_error{"The file " + value + " is empty."};
 
-                if (is_minimiser_input)
-                    minimiser_file_validator(file_path);
-                else
-                    sequence_file_validator(file_path);
+                    if (is_minimiser_input)
+                        minimiser_file_validator(file_path);
+                    else
+                        sequence_file_validator(file_path);
+                }
             }
         }
     }

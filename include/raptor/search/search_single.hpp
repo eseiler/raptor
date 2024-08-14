@@ -45,7 +45,7 @@ void search_single(search_arguments const & arguments, index_t && index)
     {
         size_t position{};
         std::string line{};
-        for (auto const & file_list : arguments.bin_path)
+        for (auto const & file_list : arguments.bin_path) //TODO these are all the bins present in the HIBF right? either change this to ibf.user_bins or update bin_paths after an update operation.
         {
             line.clear();
             line = '#';
@@ -67,7 +67,7 @@ void search_single(search_arguments const & arguments, index_t && index)
 
     auto worker = [&](size_t const start, size_t const end)
     {
-        auto counter = [&index]()
+        auto counter = [&index, is_ibf]()
         {
             if constexpr (is_ibf)
                 return index.ibf().template counting_agent<uint16_t>();

@@ -41,26 +41,16 @@ struct build_data
         return std::atomic_fetch_add(&user_bin_number, 1u);
     }
 
-    void resize()
+    void resize() // this function is called in read_chopper_pack_file.cpp
     {
         hibf.ibf_vector.resize(number_of_ibfs);
         hibf.user_bins.set_ibf_count(number_of_ibfs);
         hibf.user_bins.set_user_bin_count(number_of_user_bins);
         hibf.next_ibf_id.resize(number_of_ibfs);
-    }
+        hibf.occupancy_table.resize(number_of_ibfs);
+        hibf.fpr_table.resize(number_of_ibfs);
+        //hibf.ibf_sizes.resize(number_of_ibfs);
 
-    void compute_fp_correction(size_t const tmax, size_t const hash, double const fpr)
-    {
-        fp_correction.resize(tmax + 1, 1.0);
-
-        double const denominator = std::log(1 - std::exp(std::log(fpr) / hash));
-
-        for (size_t i = 2; i <= tmax; ++i)
-        {
-            double const tmp = 1.0 - std::pow(1 - fpr, static_cast<double>(i));
-            fp_correction[i] = std::log(1 - std::exp(std::log(tmp) / hash)) / denominator;
-            assert(fp_correction[i] >= 1.0);
-        }
     }
 };
 

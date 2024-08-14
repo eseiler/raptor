@@ -20,18 +20,20 @@ void chopper_build(build_arguments const & arguments)
 {
     build_data<data_layout_mode> data{};
 
+
+
     create_ibfs_from_chopper_pack(data, arguments);
 
     std::vector<std::vector<std::string>> bin_path{};
     for (size_t i{0}; i < data.hibf.user_bins.num_user_bins(); ++i)
         bin_path.push_back(std::vector<std::string>{data.hibf.user_bins.filename_of_user_bin(i)});
-
     raptor_index<hierarchical_interleaved_bloom_filter<data_layout_mode>> index{window{arguments.window_size},
                                                                                 arguments.shape,
                                                                                 arguments.parts,
                                                                                 arguments.compressed,
                                                                                 bin_path,
                                                                                 std::move(data.hibf)};
+
 
     store_index(arguments.out_path, index, arguments);
 }
@@ -41,3 +43,5 @@ template void chopper_build<seqan3::data_layout::uncompressed>(build_arguments c
 template void chopper_build<seqan3::data_layout::compressed>(build_arguments const &);
 
 } // namespace raptor::hibf
+
+

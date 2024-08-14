@@ -44,6 +44,9 @@ struct build_arguments
     bool is_socks{false};
     bool is_hibf{false};
     bool is_minimiser{false};
+
+    // Dynamic
+    bool update_seqs{false};
 };
 
 } // namespace raptor

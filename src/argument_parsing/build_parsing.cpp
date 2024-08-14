@@ -17,7 +17,6 @@ namespace raptor
 void init_build_parser(sharg::parser & parser, build_arguments & arguments)
 {
     init_shared_meta(parser);
-    parser.info.description.emplace_back("Constructs a Raptor index of large collections of nucleotide sequences.");
     parser.info.examples = {
         "raptor build --kmer 19 --window 23 --size 8m --output raptor.index all_bin_paths.txt",
         "raptor build --kmer 19 --window 23 --compute-minimiser --output precomputed_minimisers all_bin_paths.txt",
@@ -84,6 +83,13 @@ void init_build_parser(sharg::parser & parser, build_arguments & arguments)
                                     .description = "False positive rate of the HIBF.",
                                     .advanced = true,
                                     .validator = sharg::arithmetic_range_validator{0.0, 1.0}});
+
+    parser.add_flag(arguments.update_seqs,
+                sharg::config{
+                    .short_id = '\0',
+                    .long_id = "update-sequences",
+                    .description = "The percentage of extra space that should be allocated to each user bin, to support future sequence insertions",
+                });
 
     parser.add_flag(
         arguments.compressed,

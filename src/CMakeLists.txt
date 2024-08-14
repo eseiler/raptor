@@ -1,5 +1,6 @@
 cmake_minimum_required (VERSION 3.18)
 
+
 set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
@@ -12,6 +13,7 @@ raptor_require_ccache ()
 
 # Dependency: Chopper
 include (FetchContent)
+
 
 FetchContent_Declare (raptor_chopper_project URL "${RAPTOR_SUBMODULES_DIR}/chopper")
 
@@ -56,15 +58,25 @@ endif ()
 if (NOT TARGET raptor_lib)
     add_library ("raptor_lib" INTERFACE)
     target_link_libraries ("raptor_lib" INTERFACE "raptor_argument_parsing" "raptor_build" "raptor_build_hibf"
-                                                  "raptor_search" "raptor_threshold" "raptor_upgrade" "raptor_layout"
-    )
+    "raptor_layout" "raptor_search" "raptor_threshold" "raptor_update"
+            "raptor_search" "raptor_threshold"
+
+            )
+
 endif ()
 
 # Raptor executable
 if (NOT TARGET raptor)
     add_executable ("raptor" raptor.cpp)
     target_link_libraries ("raptor" PUBLIC "raptor_lib")
+    set(SOURCE_FILES evaluation.cpp)
+    add_executable(evaluate ${SOURCE_FILES})
+    target_link_libraries ("evaluate" PUBLIC "raptor_lib")
+    set(SOURCE_FILES generate_reads.cpp)
+    add_executable(generate_reads ${SOURCE_FILES})
+    target_link_libraries ("generate_reads" PUBLIC "raptor_lib")
 endif ()
+
 
 install (TARGETS raptor DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
@@ -74,3 +86,5 @@ add_subdirectory (layout)
 add_subdirectory (search)
 add_subdirectory (threshold)
 add_subdirectory (upgrade)
+add_subdirectory (update)
+

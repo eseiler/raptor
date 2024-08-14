@@ -18,10 +18,12 @@ namespace raptor::hibf
 template <seqan3::data_layout data_layout_mode>
 void loop_over_children(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                         seqan3::interleaved_bloom_filter<> & ibf,
+                        size_t ibf_pos_cur,
                         std::vector<int64_t> & ibf_positions,
                         lemon::ListDigraph::Node const & current_node,
                         build_data<data_layout_mode> & data,
                         build_arguments const & arguments,
-                        bool is_root);
+                        bool is_root,
+                        size_t & empty_bin_kmers);
 
 } // namespace raptor::hibf

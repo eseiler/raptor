@@ -19,11 +19,13 @@ namespace raptor::hibf
 template <seqan3::data_layout data_layout_mode>
 void loop_over_children(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                         seqan3::interleaved_bloom_filter<> & ibf,
+                        size_t ibf_pos_cur, // position of the current ibf, 'ibf'
                         std::vector<int64_t> & ibf_positions,
                         lemon::ListDigraph::Node const & current_node,
                         build_data<data_layout_mode> & data,
                         build_arguments const & arguments,
-                        bool is_root)
+                        bool is_root,
+                        size_t & empty_bin_kmers)
 {
     auto & current_node_data = data.node_map[current_node];
     std::vector<lemon::ListDigraph::Node> children{};
@@ -44,13 +46,16 @@ void loop_over_children(robin_hood::unordered_flat_set<size_t> & parent_kmers,
         if (child != current_node_data.favourite_child)
         {
             robin_hood::unordered_flat_set<size_t> kmers{};
-            size_t const ibf_pos = hierarchical_build(kmers, child, data, arguments, false);
+            size_t const ibf_pos = hierarchical_build(kmers, child, data, arguments, false, empty_bin_kmers);
             auto parent_bin_index = data.node_map[child].parent_bin_index;
             {
                 size_t const mutex_id{parent_bin_index / 64};
                 std::lock_guard<std::mutex> guard{local_ibf_mutex[mutex_id]};
                 ibf_positions[parent_bin_index] = ibf_pos;
-                insert_into_ibf(parent_kmers, kmers, 1, parent_bin_index, ibf, is_root);
+                if (kmers.size()) // it may happen that the the lower IBF only contains empty bins.
+                    insert_into_ibf(parent_kmers, kmers,
+                                 std::make_tuple((uint64_t) ibf_pos_cur, (uint64_t) parent_bin_index, (uint64_t) 1),
+                                 data.hibf, ibf, is_root);
             }
         }
     };
@@ -76,18 +81,22 @@ void loop_over_children(robin_hood::unordered_flat_set<size_t> & parent_kmers,
 
 template void loop_over_children<seqan3::data_layout::uncompressed>(robin_hood::unordered_flat_set<size_t> &,
                                                                     seqan3::interleaved_bloom_filter<> &,
+                                                                    size_t,
                                                                     std::vector<int64_t> &,
                                                                     lemon::ListDigraph::Node const &,
                                                                     build_data<seqan3::data_layout::uncompressed> &,
                                                                     build_arguments const &,
-                                                                    bool);
+                                                                    bool,
+                                                                    size_t &);
 
 template void loop_over_children<seqan3::data_layout::compressed>(robin_hood::unordered_flat_set<size_t> &,
                                                                   seqan3::interleaved_bloom_filter<> &,
+                                                                  size_t,
                                                                   std::vector<int64_t> &,
                                                                   lemon::ListDigraph::Node const &,
                                                                   build_data<seqan3::data_layout::compressed> &,
                                                                   build_arguments const &,
-                                                                  bool);
+                                                                  bool,
+                                                                  size_t &);
 
 } // namespace raptor::hibf

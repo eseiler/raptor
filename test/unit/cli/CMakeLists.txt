@@ -9,5 +9,6 @@ cmake_minimum_required (VERSION 3.18)
 
 add_subdirectory (argument_parsing)
 add_subdirectory (build)
+add_subdirectory (update)
 add_subdirectory (search)
 add_subdirectory (upgrade)

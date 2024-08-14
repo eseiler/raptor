@@ -10,12 +10,14 @@
 #include <robin_hood.h>
 
 #include <seqan3/search/dream_index/interleaved_bloom_filter.hpp>
-
+#include <raptor/argument_parsing/upgrade_arguments.hpp> //Myrthe 14.10
 #include <raptor/argument_parsing/build_arguments.hpp>
 #include <raptor/build/hibf/chopper_pack_record.hpp>
+#include "raptor/index.hpp"
 
 namespace raptor::hibf
 {
+
 
 // automatically does naive splitting if number_of_bins > 1
 void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
@@ -24,9 +26,33 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
                      size_t const bin_index,
                      seqan3::interleaved_bloom_filter<> & ibf,
                      bool is_root);
+template <seqan3::data_layout data_layout_mode>
+void insert_into_ibf(robin_hood::unordered_flat_set<size_t> & parent_kmers,
+                     robin_hood::unordered_flat_set<size_t> const & kmers, // kmers or minimizers
+                     std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
+                     raptor::hierarchical_interleaved_bloom_filter<data_layout_mode> & index,
+                      seqan3::interleaved_bloom_filter<> & ibf,
+                     bool is_root);
+//alternative using indextriple and index.
 
-void insert_into_ibf(build_arguments const & arguments,
+template <typename arguments_t> //Myrthe 14.10
+void insert_into_ibf(arguments_t const & arguments,
                      chopper_pack_record const & record,
                      seqan3::interleaved_bloom_filter<> & ibf);
 
+void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // kmers or minimizers
+                     size_t const number_of_bins,
+                     size_t const bin_index,
+                     seqan3::interleaved_bloom_filter<> & ibf); //Myrthe 16.10
 } // namespace raptor::hibf
+namespace raptor
+{
+using index_structure_t = std::conditional_t<seqan3::uncompressed, index_structure::hibf_compressed, index_structure::hibf>;
+void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers,
+                std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
+                raptor_index<index_structure::hibf> & index);
+void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers, // kmers or minimizers
+                    std::tuple <uint64_t, uint64_t, uint16_t> index_triple,
+                    raptor_index<index_structure_t> & index,
+                     std::tuple <uint64_t, uint64_t> & rebuild_index_tuple);  //Myrthe 20.10
+} // namespace raptor
