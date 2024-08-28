@@ -45,6 +45,9 @@ void init_update_parser(sharg::parser & parser, update_arguments & arguments)
                                     .long_id = "threads",
                                     .description = "The number of threads to use.",
                                     .validator = positive_integer_validator{}});
+
+    parser.add_option(arguments.user_bins_to_delete,
+                      sharg::config{.short_id = '\0', .long_id = "delete", .description = "UB to delete"});
 }
 
 void update_parsing(sharg::parser & parser)

@@ -34,6 +34,8 @@ struct update_arguments
     uint8_t parts{1u};
     bool is_hibf{false};
     double fpr{0.05};
+
+    std::vector<size_t> user_bins_to_delete{};
 };
 
 } // namespace raptor
