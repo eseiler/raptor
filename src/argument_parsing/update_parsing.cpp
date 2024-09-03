@@ -48,6 +48,12 @@ void init_update_parser(sharg::parser & parser, update_arguments & arguments)
 
     parser.add_option(arguments.user_bins_to_delete,
                       sharg::config{.short_id = '\0', .long_id = "delete", .description = "UB to delete"});
+
+    parser.add_option(arguments.user_bin_to_insert,
+                      sharg::config{.short_id = '\0',
+                                    .long_id = "insert",
+                                    .description = "UB to insert",
+                                    .validator = sharg::input_file_validator{}});
 }
 
 void update_parsing(sharg::parser & parser)

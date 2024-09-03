@@ -8,6 +8,6 @@ if (TARGET raptor::update)
     return ()
 endif ()
 
-add_library ("raptor_update" STATIC raptor_update.cpp)
+add_library ("raptor_update" STATIC raptor_update.cpp delete_user_bins.cpp dump_index.cpp insert_user_bin.cpp)
 target_link_libraries ("raptor_update" PUBLIC "raptor::interface")
 add_library (raptor::update ALIAS raptor_update)
