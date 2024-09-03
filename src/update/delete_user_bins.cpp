@@ -32,11 +32,12 @@ void delete_user_bins(update_arguments const & arguments, raptor_index<index_str
 
         for (size_t bin_index = 0; bin_index < to_user_bin_id.size(); ++bin_index)
         {
-            int64_t & user_bin_id = to_user_bin_id[bin_index];
-            if (std::ranges::find(arguments.user_bins_to_delete, user_bin_id) != arguments.user_bins_to_delete.end())
+            uint64_t & user_bin_id = to_user_bin_id[bin_index];
+            // This also ensures that invalid user bin IDs are not processed. TODO: Warning/Check?
+            if (std::ranges::contains(arguments.user_bins_to_delete, user_bin_id))
             {
                 technical_bins_to_delete.push_back(seqan::hibf::bin_index{bin_index});
-                user_bin_id = -2;
+                user_bin_id = seqan::hibf::bin_kind::deleted;
             }
         }
 
@@ -48,7 +49,10 @@ void delete_user_bins(update_arguments const & arguments, raptor_index<index_str
                 ibf.occupancy[technical_bin_index.value] = 0u;
                 ibf.occupied_bins[technical_bin_index.value] = false;
             }
-            ibf.overwrite_bin_count(ibf.bin_count() - technical_bins_to_delete.size());
+            [[maybe_unused]] bool const set_bin_count1 =
+                ibf.set_bin_count(seqan::hibf::bin_count{ibf.bin_count() - technical_bins_to_delete.size()});
+            assert(set_bin_count1); // reducing bin count should always work
+            // Either there is no occupied bin or there are still user bins. Both cannot be false or true at the same time.
             assert(ibf.occupied_bins.none() ^ ibf.bin_count());
             // Delete in parent
             if (ibf_index != 0 && ibf.occupied_bins.none())
@@ -60,8 +64,10 @@ void delete_user_bins(update_arguments const & arguments, raptor_index<index_str
 
                 parent_ibf.occupancy[parent.bin_idx] = 0u;
                 parent_ibf.occupied_bins[parent.bin_idx] = false;
-                ibf_bin_to_user_bin_id[parent.ibf_idx][parent.bin_idx] = -2;
-                parent_ibf.overwrite_bin_count(parent_ibf.bin_count() - 1u);
+                ibf_bin_to_user_bin_id[parent.ibf_idx][parent.bin_idx] = seqan::hibf::bin_kind::deleted;
+                [[maybe_unused]] bool const set_bin_count2 =
+                    parent_ibf.set_bin_count(seqan::hibf::bin_count{parent_ibf.bin_count() - 1u});
+                assert(set_bin_count2); // reducing bin count should always work
             }
         }
     }

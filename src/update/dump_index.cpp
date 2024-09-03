@@ -27,7 +27,18 @@ void dump_index(raptor_index<index_structure::hibf> const & index)
         char sep{};
         for (auto const val : to_user_bin_id)
         {
-            std::cerr << sep << val;
+            switch (val)
+            {
+            case seqan::hibf::bin_kind::deleted:
+                std::cerr << sep << 'D';
+                break;
+            case seqan::hibf::bin_kind::merged:
+                std::cerr << sep << 'M';
+                break;
+            default:
+                std::cerr << sep << val;
+            }
+
             sep = ',';
         }
         std::cerr << "]\n";
