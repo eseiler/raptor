@@ -8,6 +8,7 @@
  */
 
 #include <hibf/contrib/robin_hood.hpp>
+#include <hibf/misc/divide_and_ceil.hpp>
 
 #include <raptor/file_reader.hpp>
 #include <raptor/update/insert_user_bin.hpp>
@@ -186,14 +187,6 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
 
 #endif
 
-struct ibf_max
-{
-    size_t max_elements;
-    size_t ibf_idx;
-
-    constexpr auto operator<=>(ibf_max const & other) const = default;
-};
-
 struct max_elements_parameters
 {
     double fpr{};
@@ -205,7 +198,6 @@ struct max_elements_parameters
 inline constexpr size_t max_elements(max_elements_parameters const & params)
 {
     assert(params.hash_count > 0);
-    assert(params.bin_size > 0);
     assert(params.fpr > 0.0);
     assert(params.fpr < 1.0);
 
@@ -216,24 +208,64 @@ inline constexpr size_t max_elements(max_elements_parameters const & params)
     return result;
 }
 
+struct ibf_max
+{
+    size_t max_elements;
+    size_t ibf_idx;
+
+    constexpr auto operator<=>(ibf_max const & other) const = default;
+};
+
 // Shouldn't this be the occupancy? However, bins might get cleared.
 // Answer: Split bin correction :)
 std::vector<ibf_max> max_ibf_sizes(raptor_index<index_structure::hibf> const & index)
 {
     auto const & ibf_vector = index.ibf().ibf_vector;
-    std::vector<ibf_max> max_sizes(ibf_vector.size());
-
-    auto const global_fpr = index.fpr();
-    auto const global_hash_count = ibf_vector.front().hash_function_count();
+    std::vector<ibf_max> max_sizes{};
+    max_sizes.reserve(ibf_vector.size());
 
     for (size_t i = 0; i < ibf_vector.size(); ++i)
     {
-        size_t const max_kmers =
-            max_elements({.fpr = global_fpr, .hash_count = global_hash_count, .bin_size = ibf_vector[i].bin_size()});
-        max_sizes[i] = {max_kmers, i};
+        auto const & ibf = ibf_vector[i];
+        size_t const max_kmers = max_elements({.fpr = index.fpr(), //
+                                               .hash_count = ibf.hash_function_count(),
+                                               .bin_size = ibf.bin_size()});
+        max_sizes.push_back({.max_elements = max_kmers, .ibf_idx = i});
     }
     std::ranges::sort(max_sizes);
     return max_sizes;
+}
+
+struct required_technical_bins_parameters
+{
+    size_t bin_size{};
+    size_t elements{};
+    double fpr{};
+    size_t hash_count{};
+    size_t max_elements{};
+};
+
+size_t required_technical_bins(required_technical_bins_parameters const & params)
+{
+    auto compute_fpr = [&](size_t const elements)
+    {
+        double const exp_arg = (params.hash_count * elements) / static_cast<double>(params.bin_size);
+        double const log_arg = 1.0 - std::exp(-exp_arg);
+        return std::exp(params.hash_count * std::log(log_arg));
+    };
+
+    auto compute_split_fpr = [&](size_t const split)
+    {
+        double const fpr_tb = compute_fpr(seqan::hibf::divide_and_ceil(params.elements, split));
+        return 1.0 - std::exp(std::log1p(-fpr_tb) * split);
+    };
+
+    size_t number_of_bins = seqan::hibf::divide_and_ceil(params.elements, params.max_elements);
+
+    while (compute_split_fpr(number_of_bins) > params.fpr)
+        ++number_of_bins;
+
+    return number_of_bins;
 }
 
 void insert_user_bin(update_arguments const & arguments, raptor_index<index_structure::hibf> & index)
