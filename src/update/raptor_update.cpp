@@ -34,6 +34,7 @@ void raptor_update(update_arguments const & arguments)
     if (!arguments.user_bin_to_insert.empty())
     {
         insert_user_bin(arguments, index);
+        dump_index(index);
     }
 }
 
