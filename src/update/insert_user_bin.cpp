@@ -195,85 +195,70 @@ find_empty_bin_idx(raptor_index<index_structure::hibf> & index, size_t const ibf
     // Question resize above tmax?
 }
 
-size_t find_ibf_size_splitting(std::vector<ibf_max> const & array,
+size_t find_ibf_size_splitting(std::vector<ibf_max> const & max_ibf_sizes,
                                size_t const kmer_count,
                                raptor_index<index_structure::hibf> & index)
 {
-    // 1. FINDING THE IBF WITH BEST SIZE
+    size_t const number_of_ibfs = max_ibf_sizes.size();
+
+    // 1. Find best fit.
     // https://godbolt.org/z/8dbznss37
     size_t const binary_search_index = [&]()
     {
-        auto lower = std::ranges::lower_bound(array, ibf_max{.max_elements = kmer_count, .ibf_idx = 0});
+        auto lower = std::ranges::lower_bound(max_ibf_sizes, ibf_max{.max_elements = kmer_count, .ibf_idx = 0});
         // There was no IBF with a size large enough to fit the new user bin.
-        if (lower == array.end())
-            return array.size() - 1u;
+        if (lower == max_ibf_sizes.end())
+            return number_of_ibfs - 1u;
         else
-            return static_cast<size_t>(std::ranges::distance(array.begin(), lower));
+            return static_cast<size_t>(std::ranges::distance(max_ibf_sizes.begin(), lower));
     }();
 
-    // 2. EMPTY BINS IN SMALLER IBFS
-    // index in the size_array of the 'perfect' IBF, which is just large enough to fit the new user bin.
-    size_t smaller_ibf_idx = binary_search_index;
-    // TODO: do-while loop
-    while (true)
+    // 2. Check smaller IBFs.
+    size_t ibf_size_idx = binary_search_index;
+
+    do
     {
-        std::cerr << "smaller_ibf_idx = " << smaller_ibf_idx << '\n';
-        size_t const ibf_idx = array[smaller_ibf_idx].ibf_idx;
+        size_t const ibf_idx = max_ibf_sizes[ibf_size_idx].ibf_idx;
         auto & ibf = index.ibf().ibf_vector[ibf_idx];
 
-        // calculate among how many bins we should split
-        size_t const number_of_bins = required_technical_bins({.bin_size = ibf.bin_size(),
-                                                               .elements = kmer_count,
-                                                               .fpr = index.fpr(),
-                                                               .hash_count = ibf.hash_function_count(),
-                                                               .max_elements = array[smaller_ibf_idx].max_elements});
-        std::cerr << "Required bins = " << number_of_bins << '\n';
+        size_t const number_of_bins =
+            required_technical_bins({.bin_size = ibf.bin_size(),
+                                     .elements = kmer_count,
+                                     .fpr = index.fpr(),
+                                     .hash_count = ibf.hash_function_count(),
+                                     .max_elements = max_ibf_sizes[ibf_size_idx].max_elements});
 
-        // if we do find empty bins, just return this IBF.
         if (find_empty_bin_idx(index, ibf_idx, number_of_bins) != std::numeric_limits<size_t>::max())
             return ibf_idx;
-        else if (smaller_ibf_idx == 0u)
-            break;
-        else
-            smaller_ibf_idx -= 1;
     }
+    while (ibf_size_idx-- != 0u);
 
-    // 3. EMPTY BINS IN LARGER IBFs
-    size_t larger_ibf_idx = binary_search_index;
-    size_t ibf_idx = array[larger_ibf_idx].ibf_idx;
-
-    while (ibf_idx) // while the ibf is not the root
+    // 3. Check parent IBF and IBFs IBFs with sizes between original IBF's size and parent's size.
+    ibf_size_idx = binary_search_index;
+    for (size_t ibf_idx = max_ibf_sizes[ibf_size_idx].ibf_idx; ibf_idx != 0u;)
     {
-        std::cerr << "larger_ibf_idx = " << larger_ibf_idx << '\n';
         size_t const parent_ibf_idx = index.ibf().prev_ibf_id[ibf_idx].ibf_idx;
         auto const & ibf_parent = index.ibf().ibf_vector[parent_ibf_idx];
 
-        // the parent has at least one empty bin, which should accomodate a partial rebuild.
+        // Parent has space.
         if (find_empty_bin_idx(index, parent_ibf_idx, 1) != std::numeric_limits<size_t>::max())
-        {
             return ibf_idx; // this should trigger a resize and partial rebuild down the stream.
-        }
-        else
+
+        // Check IBFs with sizes between original IBF's size and parent's size.
+        for (; ibf_size_idx < number_of_ibfs && max_ibf_sizes[ibf_size_idx].max_elements < ibf_parent.bin_size();
+             ++ibf_size_idx)
         {
-            size_t const size_parent = ibf_parent.bin_size();
-            // and thereby larger_ibf_idx will be larger than the maximum value of the array
-            while (larger_ibf_idx < array.size() && array[larger_ibf_idx].max_elements < size_parent)
-            {
-                ibf_idx = array[larger_ibf_idx].ibf_idx;
-                if (find_empty_bin_idx(index, ibf_idx, 1) != std::numeric_limits<size_t>::max())
-                    return ibf_idx; // if we do find empty bins, just return this IBF.
-                else
-                    larger_ibf_idx += 1;
-            }
+            ibf_idx = max_ibf_sizes[ibf_size_idx].ibf_idx;
+            if (find_empty_bin_idx(index, ibf_idx, 1) != std::numeric_limits<size_t>::max())
+                return ibf_idx;
         }
-        // this also includes the case where std::get<1>(array[larger_ibf_idx]) == parent_ibf_idx, which should be the case if the parents always have larger IBF bin sizes.
-        if (larger_ibf_idx < array.size())
-            ibf_idx = array[larger_ibf_idx].ibf_idx;
-        else
+
+        if (ibf_size_idx == number_of_ibfs)
             return ibf_idx;
+
+        ibf_idx = max_ibf_sizes[ibf_size_idx].ibf_idx;
     }
-    std::cerr << "fallback = " << ibf_idx << '\n';
-    return ibf_idx; // a full rebuild will be triggered.
+    return 0u; // a full rebuild will be triggered.
 }
 
 void insert_user_bin(update_arguments const & arguments, raptor_index<index_structure::hibf> & index)
@@ -301,6 +286,7 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
     index.ibf().ibf_vector[0].set_bin_count(seqan::hibf::bin_count{64u});
     std::cerr << "Find ibf for " << kmer_count << " kmers: " << find_ibf_size_splitting(max_kmers, kmer_count, index)
               << '\n';
+    std::cerr << "Test " << find_ibf_size_splitting(max_kmers, 10, index) << '\n';
 
     (void)arguments;
 }
