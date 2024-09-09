@@ -270,7 +270,8 @@ size_t required_technical_bins(required_technical_bins_parameters const & params
 
 void insert_user_bin(update_arguments const & arguments, raptor_index<index_structure::hibf> & index)
 {
-    auto const max_kmers = max_ibf_sizes(index);
+    std::vector<ibf_max> const max_kmers = max_ibf_sizes(index);
+    assert(std::ranges::is_sorted(max_kmers));
     std::cerr << "  Max kmers:   [";
     char sep{};
     for (auto && [max_kmer, ibf_idx] : max_kmers)
