@@ -7,6 +7,7 @@
  * \author Enrico Seiler <enrico.seiler AT fu-berlin.de>
  */
 
+#include <hibf/build/insert_into_ibf.hpp>
 #include <hibf/contrib/robin_hood.hpp>
 #include <hibf/misc/divide_and_ceil.hpp>
 
@@ -25,37 +26,20 @@ robin_hood::unordered_flat_set<uint64_t> compute_kmers(std::filesystem::path con
     return kmers;
 }
 
-#if 0
-
-std::tuple<uint64_t, uint64_t, uint16_t> get_location(size_t kmer_count,
-                                                      robin_hood::unordered_flat_set<size_t> & kmers,
-                                                      raptor_index<index_structure::hibf> & index,
-                                                      update_arguments const & update_arguments)
+struct insert_location
 {
-    size_t root_idx = 0;
-    size_t ibf_idx = -1;
+    size_t ibf_idx;
+    size_t bin_idx;
+    size_t number_of_bins;
+};
 
-    ibf_idx = find_ibf_size_splitting(kmers.size(), index, update_arguments);
+struct rebuild_location
+{
+    size_t ibf_idx;
+    size_t bin_idx;
+};
 
-    // calculate number of user bins needed.
-    size_t number_of_bins = 1;
-    if (index.ibf().ibf_max_kmers(ibf_idx) < (size_t)kmer_count)
-    {
-        number_of_bins = index.ibf().number_of_bins(ibf_idx, (int)kmer_count);
-    }
-
-    uint64_t bin_idx = find_empty_bin_idx(index, ibf_idx, update_arguments, number_of_bins);
-    size_t ibf_bin_count = index.ibf().ibf_vector[ibf_idx].bin_count();
-
-    // The current solution resizes the IBF here, but it would be more efficient to check the tmax function after calculating the new bin count and perhaps trigger a partial rebuild dirctly.
-    if (bin_idx == ibf_bin_count)
-    {
-        size_t new_ibf_bin_count = new_bin_count(number_of_bins, update_arguments.empty_bin_percentage, ibf_bin_count);
-        index.ibf().resize_ibf(ibf_idx, new_ibf_bin_count);
-    }
-
-    return {ibf_idx, bin_idx, number_of_bins};
-}
+#if 0
 
 void insert_user_bin(update_arguments const & arguments, raptor_index<index_structure::hibf> & index)
 {
@@ -261,6 +245,90 @@ size_t find_ibf_size_splitting(std::vector<ibf_max> const & max_ibf_sizes,
     return 0u; // a full rebuild will be triggered.
 }
 
+insert_location get_location(std::vector<ibf_max> const & max_ibf_sizes,
+                             size_t const kmer_count,
+                             raptor_index<index_structure::hibf> & index)
+{
+    size_t const ibf_idx = find_ibf_size_splitting(max_ibf_sizes, kmer_count, index);
+
+    auto & ibf = index.ibf().ibf_vector[ibf_idx];
+
+    // calculate number of user bins needed.
+    size_t number_of_bins = 1;
+    // if (index.ibf().ibf_max_kmers(ibf_idx) < kmer_count)
+    if (max_ibf_sizes[ibf_idx].max_elements < kmer_count)
+    {
+        number_of_bins = required_technical_bins({.bin_size = ibf.bin_size(),
+                                                  .elements = kmer_count,
+                                                  .fpr = index.fpr(),
+                                                  .hash_count = ibf.hash_function_count(),
+                                                  .max_elements = max_ibf_sizes[ibf_idx].max_elements});
+        // number_of_bins = index.ibf().number_of_bins(ibf_idx, (int)kmer_count);
+    }
+
+    uint64_t bin_idx = find_empty_bin_idx(index, ibf_idx, number_of_bins);
+    // size_t ibf_bin_count = index.ibf().ibf_vector[ibf_idx].bin_count();
+
+    // The current solution resizes the IBF here, but it would be more efficient to check the tmax function after calculating the new bin count and perhaps trigger a partial rebuild dirctly.
+    if (bin_idx == std::numeric_limits<size_t>::max())
+    {
+        bin_idx = ibf.bin_count();
+        // TODO: empty bins percentage
+        size_t new_ibf_bin_count = bin_idx + number_of_bins;
+        // index.ibf().resize_ibf(ibf_idx, new_ibf_bin_count);
+        ibf.increase_bin_number_to(seqan::hibf::bin_count{new_ibf_bin_count});
+        ibf.occupancy.resize(new_ibf_bin_count);
+        ibf.occupied_bins.resize(new_ibf_bin_count);
+        index.ibf().next_ibf_id[ibf_idx].resize(new_ibf_bin_count, ibf_idx);
+        index.ibf().ibf_bin_to_user_bin_id[ibf_idx].resize(new_ibf_bin_count, seqan::hibf::bin_kind::deleted);
+    }
+
+    return insert_location{.ibf_idx = ibf_idx, .bin_idx = bin_idx, .number_of_bins = number_of_bins};
+}
+
+void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers,
+                     insert_location const & insert_location,
+                     raptor_index<index_structure::hibf> & index,
+                     rebuild_location & /*rebuild_index_tuple*/)
+{
+    auto & ibf = index.ibf().ibf_vector[insert_location.ibf_idx];
+
+    seqan::hibf::build::insert_into_ibf(kmers,
+                                        insert_location.number_of_bins,
+                                        insert_location.bin_idx,
+                                        ibf,
+                                        index.ibf().fill_ibf_timer);
+
+    // TODO
+    // // to improve the implementation, Perhaps do the FPR calculations for all bins to which kmers will be inserted before actually inserting.
+    // index.ibf().update_occupancy_table(kmers.size()-union_count, ibf_idx, start_bin_idx, number_of_bins);
+    // auto fpr = index.ibf().update_fpr(ibf_idx, start_bin_idx, number_of_bins); // this should be done after updating the occupancy table.
+
+    // // Keep: If any fpr is too high, the index needs to be rebuild.
+    // if (fpr > index.ibf().fpr_max){
+    //     //assert(index.ibf().next_ibf_id[ibf_idx][start_bin_idx] != ibf_idx); //assert that it is not a leaf bin. fpr should not reach fpr max for the leaf bin ibf, because we search a location such that it is 'feasible', i.e. binsize should be sufficient to accomodate new UB. However, this is not the case if one also does sequence insertions.
+    //     rebuild_index_tuple = std::make_tuple(ibf_idx, start_bin_idx);
+    // }
+}
+
+rebuild_location insert_tb_and_parents(robin_hood::unordered_flat_set<size_t> & kmers,
+                                       insert_location insert_location,
+                                       raptor_index<index_structure::hibf> & index)
+{
+    rebuild_location rebuild_location{.ibf_idx = index.ibf().ibf_vector.size(), .bin_idx = 0};
+    while (true)
+    {
+        insert_into_ibf(kmers, insert_location, index, rebuild_location);
+        if (insert_location.ibf_idx == 0u)
+            break;
+        auto const parent = index.ibf().prev_ibf_id[insert_location.ibf_idx];
+        insert_location.ibf_idx = parent.ibf_idx;
+        insert_location.bin_idx = parent.bin_idx;
+        insert_location.number_of_bins = 1u; // number of bins will be 1 for the merged bins (i assume)
+    }
+    return rebuild_location;
+}
+
 void insert_user_bin(update_arguments const & arguments, raptor_index<index_structure::hibf> & index)
 {
     auto const kmers = compute_kmers(arguments.user_bin_to_insert, index);
@@ -280,13 +348,16 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
 
     // std::cerr << "Find 1 empty bin in top-level = " << find_empty_bin_idx(index, 0, 1) << '\n';
     // std::cerr << "Find 2 empty bins in top-level = " << find_empty_bin_idx(index, 0, 2) << '\n';
-    std::cerr << "Find ibf for " << kmer_count << " kmers: " << find_ibf_size_splitting(max_kmers, kmer_count, index)
-              << '\n';
-    index.ibf().ibf_vector[0].occupied_bins.back() = true;
-    index.ibf().ibf_vector[0].set_bin_count(seqan::hibf::bin_count{64u});
-    std::cerr << "Find ibf for " << kmer_count << " kmers: " << find_ibf_size_splitting(max_kmers, kmer_count, index)
-              << '\n';
-    std::cerr << "Test " << find_ibf_size_splitting(max_kmers, 10, index) << '\n';
+    // std::cerr << "Find ibf for " << kmer_count << " kmers: " << find_ibf_size_splitting(max_kmers, kmer_count, index)
+    //           << '\n';
+    // index.ibf().ibf_vector[0].occupied_bins.back() = true;
+    // index.ibf().ibf_vector[0].set_bin_count(seqan::hibf::bin_count{64u});
+    // std::cerr << "Find ibf for " << kmer_count << " kmers: " << find_ibf_size_splitting(max_kmers, kmer_count, index)
+    //           << '\n';
+    // std::cerr << "Test " << find_ibf_size_splitting(max_kmers, 10, index) << '\n';
+
+    auto const [ibf_idx, bin_idx, number_of_bins] = get_location(max_kmers, kmer_count, index);
+    std::cerr << "  IBF: " << ibf_idx << " Bin: " << bin_idx << " Number of bins: " << number_of_bins << '\n';
 
     (void)arguments;
 }
