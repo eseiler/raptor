@@ -8,16 +8,8 @@ if (TARGET raptor::update)
     return ()
 endif ()
 
-add_library ("raptor_update" STATIC raptor_update.cpp delete_user_bins.cpp dump_index.cpp insert_user_bin.cpp
-insert/get_location.cpp
-insert/compute_kmers.cpp
-insert/required_technical_bins.cpp
-insert/max_ibf_sizes.cpp
-insert/insert_into_ibf.cpp
-insert/insert_tb_and_parents.cpp
-insert/update_bookkeeping.cpp
-insert/max_elements.cpp
-insert/find_ibf_size_splitting.cpp
-insert/find_empty_bin_idx.cpp)
+add_library ("raptor_update" STATIC delete_user_bins.cpp dump_index.cpp insert/get_location.cpp
+                                    insert/insert_tb_and_parents.cpp insert_user_bin.cpp raptor_update.cpp
+)
 target_link_libraries ("raptor_update" PUBLIC "raptor::interface")
 add_library (raptor::update ALIAS raptor_update)
