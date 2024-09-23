@@ -74,6 +74,87 @@ std::vector<ibf_max> max_ibf_sizes(raptor_index<index_structure::hibf> const & i
 namespace raptor
 {
 
+void get_ubs(robin_hood::unordered_flat_set<uint64_t> & ub_ids,
+             raptor_index<index_structure::hibf> & index,
+             size_t const ibf_idx)
+{
+    auto const & user_bin_ids = index.ibf().ibf_bin_to_user_bin_id[ibf_idx];
+    for (size_t i = 0; i < user_bin_ids.size(); ++i)
+    {
+        size_t const ub = user_bin_ids[i];
+        // TODO: Should delete shrink?
+        // -> Deleted bins don't have to be at the end!
+        switch (ub)
+        {
+        case seqan::hibf::bin_kind::merged:
+            get_ubs(ub_ids, index, index.ibf().next_ibf_id[ibf_idx][i]);
+            break;
+        case seqan::hibf::bin_kind::deleted:
+            break;
+        default:
+            ub_ids.emplace(ub);
+        }
+    }
+}
+
+void partial_rebuild(update_arguments const & arguments,
+                     detail::rebuild_location const & rebuild_location,
+                     raptor_index<index_structure::hibf> & index)
+{
+    assert(index.ibf().ibf_bin_to_user_bin_id[rebuild_location.ibf_idx][rebuild_location.bin_idx]
+           == seqan::hibf::bin_kind::merged);
+    size_t const child_ibf_id = index.ibf().next_ibf_id[rebuild_location.ibf_idx][rebuild_location.bin_idx];
+
+    std::vector<size_t> ub_ids = [&]()
+    {
+        robin_hood::unordered_flat_set<uint64_t> ub_ids{};
+
+        get_ubs(ub_ids, index, child_ibf_id);
+        return std::vector<size_t>{ub_ids.begin(), ub_ids.end()};
+    }();
+
+    auto input_fn = [&](size_t const user_bin_id, seqan::hibf::insert_iterator it)
+    {
+        raptor::file_reader<raptor::file_types::sequence> reader{index.shape(),
+                                                                 static_cast<uint32_t>(index.window_size())};
+        reader.hash_into(index.bin_path()[ub_ids[user_bin_id]], it);
+    };
+    // .number_of_hash_functions = ,
+    // .relaxed_fpr = ,
+    // .tmax =
+    seqan::hibf::config config{.input_fn = input_fn,
+                               .number_of_user_bins = ub_ids.size(),
+                               .maximum_fpr = index.fpr(),
+                               .threads = arguments.threads,
+                               .empty_bin_fraction = 0.0001};
+
+    seqan::hibf::hierarchical_interleaved_bloom_filter subindex{config};
+
+    std::cout << subindex.ibf_vector.size() << '\n';
+    for (auto const & to_user_bin_id : subindex.ibf_bin_to_user_bin_id)
+    {
+        std::cerr << "User bin[" << to_user_bin_id.size() << "]:   [";
+        char sep{};
+        for (auto const val : to_user_bin_id)
+        {
+            switch (val)
+            {
+            case seqan::hibf::bin_kind::deleted:
+                std::cerr << sep << 'D';
+                break;
+            case seqan::hibf::bin_kind::merged:
+                std::cerr << sep << 'M';
+                break;
+            default:
+                std::cerr << sep << ub_ids[val];
+            }
+
+            sep = ',';
+        }
+        std::cerr << "]\n";
+    }
+}
+
 void insert_user_bin(update_arguments const & arguments, raptor_index<index_structure::hibf> & index)
 {
     auto const kmers = detail::compute_kmers(arguments.user_bin_to_insert, index);
@@ -97,9 +178,12 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
     if (rebuild_location.ibf_idx != std::numeric_limits<size_t>::max())
     {
         std::cerr << "Partial Rebuild\n";
-        // partial_rebuild(rebuild_location, index);
+        partial_rebuild(arguments, rebuild_location, index);
         // Just construct an HIBF and attach it?
     }
+
+    //DEV
+    partial_rebuild(arguments, detail::rebuild_location{0, 14}, index);
 
     // size_t const ibf_idx = std::get<0>(index_triple);
     // check if rebuilding is needed because of exceeding the tmax
