@@ -23,7 +23,7 @@ void dump_index(raptor_index<index_structure::hibf> const & index)
     // std::cerr << "Bin path:    " << index.bin_path().front().front() << '\n';
     for (auto const & to_user_bin_id : index.ibf().ibf_bin_to_user_bin_id)
     {
-        std::cerr << "User bin:   [";
+        std::cerr << "User bin[" << to_user_bin_id.size() << "]:   [";
         char sep{};
         for (auto const val : to_user_bin_id)
         {
@@ -46,7 +46,7 @@ void dump_index(raptor_index<index_structure::hibf> const & index)
     for (auto const & ibf : index.ibf().ibf_vector)
     {
         std::cerr << "Num bins:    " << ibf.bin_count() << '\n';
-        std::cerr << "  Occupancy:   [";
+        std::cerr << "  Occupancy[" << ibf.occupancy.size() << "]:   [";
         char sep{};
         for (auto const val : ibf.occupancy)
         {
@@ -54,7 +54,7 @@ void dump_index(raptor_index<index_structure::hibf> const & index)
             sep = ',';
         }
         std::cerr << "]\n";
-        std::cerr << "  Occupied:    [";
+        std::cerr << "  Occupied[" << ibf.occupied_bins.size() << "]:    [";
         sep = {};
         for (auto const val : ibf.occupied_bins)
         {
