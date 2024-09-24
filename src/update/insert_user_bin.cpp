@@ -131,6 +131,13 @@ void partial_rebuild(update_arguments const & arguments,
         return std::vector<size_t>{ub_ids.begin(), ub_ids.end()};
     }();
 
+    std::vector<size_t> const overwrite_ibf_ids = [&]()
+    {
+        std::vector<size_t> result{};
+        get_overwrite_ibf(result, index, child_ibf_id);
+        return result;
+    }();
+
     auto input_fn = [&](size_t const user_bin_id, seqan::hibf::insert_iterator it)
     {
         raptor::file_reader<raptor::file_types::sequence> reader{index.shape(),
@@ -146,141 +153,90 @@ void partial_rebuild(update_arguments const & arguments,
                                .maximum_fpr = index.fpr(),
                                .threads = arguments.threads,
                                .empty_bin_fraction = 0.85};
-    auto config2 = config;
-    config2.validate_and_set_defaults();
-    std::cerr << "config2.tmax = " << config2.tmax << '\n';
-    std::cerr << '\n';
-
-    for (size_t i = 0; i < ub_ids.size(); ++i)
-    {
-        std::cerr << ub_ids[i] << ',';
-    }
-    std::cerr << '\n';
 
     seqan::hibf::hierarchical_interleaved_bloom_filter subindex{config};
 
-    // DEV
-    std::ranges::fill(subindex.ibf_vector[1].occupancy, 0u);
-    std::ranges::fill(subindex.ibf_vector[1].occupied_bins, false);
-    // ENDDEV
-    std::cerr << "SUBINDEX\n";
-    dump_index(subindex);
-
-    // std::cout << subindex.ibf_vector.size() << '\n';
-    // for (auto const & to_user_bin_id : subindex.ibf_bin_to_user_bin_id)
-    // {
-    //     std::cerr << "User bin[" << to_user_bin_id.size() << "]:   [";
-    //     char sep{};
-    //     for (auto const val : to_user_bin_id)
-    //     {
-    //         switch (val)
-    //         {
-    //         case seqan::hibf::bin_kind::deleted:
-    //             std::cerr << sep << 'D';
-    //             break;
-    //         case seqan::hibf::bin_kind::merged:
-    //             std::cerr << sep << 'M';
-    //             break;
-    //         default:
-    //             std::cerr << sep << ub_ids[val];
-    //         }
-
-    //         sep = ',';
-    //     }
-    //     std::cerr << "]\n";
-    // }
-    // std::cerr << '\n';
-    // std::cerr << "Number of IBFs: " << subindex.ibf_vector.size() << '\n';
-    // std::cerr << "Next IBF ID:    ";
-    // for (auto const val : subindex.next_ibf_id.front())
-    //     std::cerr << val << ',';
-    // std::cerr << "\nPrev IBF ID:    ";
-    // for (auto const prev_pair : subindex.prev_ibf_id)
-    //     std::cerr << prev_pair.ibf_idx << ':' << prev_pair.bin_idx << ',';
-    // std::cerr << "\nIBF to UB:      ";
-    // for (auto const val : subindex.ibf_bin_to_user_bin_id.front())
-    //     std::cerr << val << ',';
-    // std::cerr << "\n\n";
-
     auto & original_hibf = index.ibf();
-
-    std::vector<size_t> overwrite_ibf_ids{};
-    get_overwrite_ibf(overwrite_ibf_ids, index, child_ibf_id);
-    std::cerr << "Overwrite IBF IDs: ";
-    for (auto const val : overwrite_ibf_ids)
-        std::cerr << val << ',';
-    std::cerr << '\n';
-
-    // TODO
-    // While values in overwrite_ibf_ids, use these for new IBFs
-    // If empty, use offset to push_back
-    // If there are leftover values: ???
-    // Or just delete and then append?
-    // Maybe replace the first IBF, but delete its children and then append.
-    // Children need to be modified anyway, but this way we don't need to modify the bookkeeping in the original too much.
-
     size_t const offset = original_hibf.ibf_vector.size() - 1u;
+
+    // "Delete" children:
+    for (size_t i = 1u; i < overwrite_ibf_ids.size(); ++i)
+    {
+        size_t const ibf_id = overwrite_ibf_ids[i];
+
+        original_hibf.ibf_vector[ibf_id] = seqan::hibf::interleaved_bloom_filter{};
+        original_hibf.next_ibf_id[ibf_id].clear();
+        original_hibf.prev_ibf_id[ibf_id] = {seqan::hibf::bin_kind::deleted, seqan::hibf::bin_kind::deleted};
+        original_hibf.ibf_bin_to_user_bin_id[ibf_id].clear();
+    }
+
     // Handle the first IBF
-    // Move ibf_vector
     original_hibf.ibf_vector[child_ibf_id] = std::move(subindex.ibf_vector[0]);
-    // Move next_ibf_id
+
     auto & first_ibf_next_ibf_id = subindex.next_ibf_id[0];
-    for (auto & id : first_ibf_next_ibf_id)
-    {
-        switch (id)
-        {
-        case 0:
-            id = child_ibf_id;
-            break;
-        default:
-            id += offset;
-        }
-    }
-    original_hibf.next_ibf_id[child_ibf_id] = std::move(subindex.next_ibf_id[0]);
-    // Move ibf_bin_to_user_bin_id
+    std::ranges::for_each(first_ibf_next_ibf_id,
+                          [&](auto & id)
+                          {
+                              switch (id)
+                              {
+                              case 0:
+                                  id = child_ibf_id;
+                                  break;
+                              default:
+                                  id += offset;
+                              }
+                          });
+    original_hibf.next_ibf_id[child_ibf_id] = std::move(first_ibf_next_ibf_id);
+
     auto & first_ibf_bin_to_user_bin_id = subindex.ibf_bin_to_user_bin_id[0];
-    for (auto & id : first_ibf_bin_to_user_bin_id)
-    {
-        switch (id)
-        {
-        case seqan::hibf::bin_kind::deleted:
-            break;
-        case seqan::hibf::bin_kind::merged:
-            break;
-        default:
-            id = ub_ids[id];
-        }
-    }
-    original_hibf.ibf_bin_to_user_bin_id[child_ibf_id] = std::move(subindex.ibf_bin_to_user_bin_id[0]);
+    std::ranges::for_each(first_ibf_bin_to_user_bin_id,
+                          [&](auto & id)
+                          {
+                              switch (id)
+                              {
+                              case seqan::hibf::bin_kind::deleted:
+                                  break;
+                              case seqan::hibf::bin_kind::merged:
+                                  break;
+                              default:
+                                  id = ub_ids[id];
+                              }
+                          });
+    original_hibf.ibf_bin_to_user_bin_id[child_ibf_id] = std::move(first_ibf_bin_to_user_bin_id);
     // Prev_ibf_id does not change for first IBF
-    // Move prev_ibf_id
+
     assert(subindex.ibf_vector[0].data() == nullptr);
     assert(subindex.next_ibf_id[0].empty());
     assert(subindex.ibf_bin_to_user_bin_id[0].empty());
+
+    // Handle the rest of the IBFs
     for (size_t i = 1; i < subindex.ibf_vector.size(); ++i)
     {
         original_hibf.ibf_vector.push_back(std::move(subindex.ibf_vector[i]));
+
         auto & ibf_next_ibf_id = subindex.next_ibf_id[i];
-        for (auto & id : ibf_next_ibf_id)
-        {
-            id += offset;
-        }
-        original_hibf.next_ibf_id.push_back(std::move(subindex.next_ibf_id[i]));
+        std::ranges::for_each(ibf_next_ibf_id,
+                              [&](auto & id)
+                              {
+                                  id += offset;
+                              });
+        original_hibf.next_ibf_id.push_back(std::move(ibf_next_ibf_id));
 
         auto & ibf_bin_to_user_bin_id = subindex.ibf_bin_to_user_bin_id[i];
-        for (auto & id : ibf_bin_to_user_bin_id)
-        {
-            switch (id)
-            {
-            case seqan::hibf::bin_kind::deleted:
-                break;
-            case seqan::hibf::bin_kind::merged:
-                break;
-            default:
-                id = ub_ids[id];
-            }
-        }
-        original_hibf.ibf_bin_to_user_bin_id.push_back(std::move(subindex.ibf_bin_to_user_bin_id[i]));
+        std::ranges::for_each(ibf_bin_to_user_bin_id,
+                              [&](auto & id)
+                              {
+                                  switch (id)
+                                  {
+                                  case seqan::hibf::bin_kind::deleted:
+                                      break;
+                                  case seqan::hibf::bin_kind::merged:
+                                      break;
+                                  default:
+                                      id = ub_ids[id];
+                                  }
+                              });
+        original_hibf.ibf_bin_to_user_bin_id.push_back(std::move(ibf_bin_to_user_bin_id));
 
         auto prev_idx = subindex.prev_ibf_id[i];
         if (prev_idx.ibf_idx == 0)
@@ -298,15 +254,6 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
 
     std::vector<detail::ibf_max> const max_kmers = detail::max_ibf_sizes(index);
     assert(std::ranges::is_sorted(max_kmers));
-    // std::cerr << "  Max kmers:   [";
-    // char sep{};
-    // for (auto && [max_kmer, ibf_idx] : max_kmers)
-    // {
-    //     std::cerr << sep << max_kmer;
-    //     sep = ',';
-    //     (void)ibf_idx;
-    // }
-    // std::cerr << "]\n";
 
     auto const insert_location = detail::get_location(max_kmers, kmer_count, index);
     index.append_bin_path({arguments.user_bin_to_insert}); // TODO: update_bookkeeping, but it doesn't have the args
