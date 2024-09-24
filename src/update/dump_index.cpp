@@ -14,6 +14,11 @@ namespace raptor
 
 void dump_index(raptor_index<index_structure::hibf> const & index)
 {
+    dump_index(index.ibf());
+}
+
+void dump_index(seqan::hibf::hierarchical_interleaved_bloom_filter const & hibf)
+{
     std::cerr << "\nDumping index\n";
     // std::cerr << "Window size: " << index.window_size() << '\n';
     // std::cerr << "Shape:       " << index.shape().to_string() << '\n';
@@ -21,7 +26,7 @@ void dump_index(raptor_index<index_structure::hibf> const & index)
     // std::cerr << "FPR:         " << index.fpr() << '\n';
     // std::cerr << "Type:        " << (index.is_hibf() ? "HIBF" : "IBF") << '\n';
     // std::cerr << "Bin path:    " << index.bin_path().front().front() << '\n';
-    for (auto const & to_user_bin_id : index.ibf().ibf_bin_to_user_bin_id)
+    for (auto const & to_user_bin_id : hibf.ibf_bin_to_user_bin_id)
     {
         std::cerr << "User bin[" << to_user_bin_id.size() << "]:   [";
         char sep{};
@@ -43,7 +48,7 @@ void dump_index(raptor_index<index_structure::hibf> const & index)
         }
         std::cerr << "]\n";
     }
-    for (auto const & ibf : index.ibf().ibf_vector)
+    for (auto const & ibf : hibf.ibf_vector)
     {
         std::cerr << "Num bins:    " << ibf.bin_count() << '\n';
         std::cerr << "  Occupancy[" << ibf.occupancy.size() << "]:   [";

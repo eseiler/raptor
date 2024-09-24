@@ -15,5 +15,6 @@ namespace raptor
 {
 
 void dump_index(raptor_index<index_structure::hibf> const & index);
+void dump_index(seqan::hibf::hierarchical_interleaved_bloom_filter const & hibf);
 
 } // namespace raptor
