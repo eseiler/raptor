@@ -33,7 +33,7 @@ TEST_F(build_hibf_layout, pipeline)
                                                    "--input",
                                                    data_filename,
                                                    "--tmax 64",
-                                                   "--empty-bin-fraction 0.85",
+                                                   "--empty-bin-fraction 0.001",
                                                    "--fpr 0.05",
                                                    "--output",
                                                    layout_filename);

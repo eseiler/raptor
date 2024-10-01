@@ -119,6 +119,7 @@ void partial_rebuild(update_arguments const & arguments,
                      detail::rebuild_location const & rebuild_location,
                      raptor_index<index_structure::hibf> & index)
 {
+    std::cerr << "Partial Rebuild\n";
     assert(index.ibf().ibf_bin_to_user_bin_id[rebuild_location.ibf_idx][rebuild_location.bin_idx]
            == seqan::hibf::bin_kind::merged);
     size_t const child_ibf_id = index.ibf().next_ibf_id[rebuild_location.ibf_idx][rebuild_location.bin_idx];
@@ -144,15 +145,14 @@ void partial_rebuild(update_arguments const & arguments,
                                                                  static_cast<uint32_t>(index.window_size())};
         reader.hash_into(index.bin_path()[ub_ids[user_bin_id]], it);
     };
-    // .number_of_hash_functions = ,
-    // .relaxed_fpr = ,
-    // .tmax =
-    // TODO Store config in index
-    seqan::hibf::config config{.input_fn = input_fn,
-                               .number_of_user_bins = ub_ids.size(),
-                               .maximum_fpr = index.fpr(),
-                               .threads = arguments.threads,
-                               .empty_bin_fraction = 0.85};
+
+    seqan::hibf::config config{index.config()};
+    // config.tmax = 0u;
+    config.input_fn = input_fn;
+    config.number_of_user_bins = ub_ids.size();
+    config.threads = arguments.threads;
+    // config.validated = false;
+    // config.validate_and_set_defaults();
 
     seqan::hibf::hierarchical_interleaved_bloom_filter subindex{config};
 
@@ -247,6 +247,59 @@ void partial_rebuild(update_arguments const & arguments,
     }
 }
 
+static constexpr bool consider_lower_level_tmax{false};
+
+bool check_tmax_rebuild(update_arguments const & arguments,
+                        raptor_index<index_structure::hibf> & index,
+                        size_t const ibf_idx)
+{
+    std::cerr << "check_tmax_rebuild\n";
+    // TODO tmax is with empty bins subtracted
+    if (index.ibf().ibf_vector[ibf_idx].bin_count() > seqan::hibf::next_multiple_of_64(index.config().tmax))
+    {
+        if (ibf_idx == 0u)
+        {
+            std::cerr << "Full Rebuild\n";
+            // full rebuild
+            auto bin_path = index.bin_path();
+            auto const shape = index.shape();
+            auto const window_size = static_cast<uint32_t>(index.window_size());
+
+            auto input_fn = [&](size_t const user_bin_id, seqan::hibf::insert_iterator it)
+            {
+                raptor::file_reader<raptor::file_types::sequence> reader{shape, window_size};
+                reader.hash_into(bin_path[user_bin_id], it);
+            };
+
+            seqan::hibf::config config{index.config()};
+            config.tmax = 0u; //seqan::hibf::next_multiple_of_64(config.tmax + 64u);
+            config.input_fn = std::move(input_fn);
+            config.number_of_user_bins = bin_path.size();
+            config.threads = arguments.threads;
+            config.validated = false;
+            config.validate_and_set_defaults();
+
+            index = {};
+            seqan::hibf::hierarchical_interleaved_bloom_filter hibf{config};
+            index = raptor_index<index_structure::hibf>{window{window_size},
+                                                        shape,
+                                                        1u,
+                                                        std::move(bin_path),
+                                                        config,
+                                                        std::move(hibf)};
+        }
+        else if constexpr (consider_lower_level_tmax)
+        {
+            auto const parent = index.ibf().prev_ibf_id[ibf_idx];
+            partial_rebuild(arguments, detail::rebuild_location{parent.ibf_idx, parent.bin_idx}, index);
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
 void insert_user_bin(update_arguments const & arguments, raptor_index<index_structure::hibf> & index)
 {
     auto const kmers = detail::compute_kmers(arguments.user_bin_to_insert, index);
@@ -259,31 +312,44 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
     index.append_bin_path({arguments.user_bin_to_insert}); // TODO: update_bookkeeping, but it doesn't have the args
     auto const rebuild_location = detail::insert_tb_and_parents(kmers, insert_location, index);
 
+    std::cerr << "insert_location: (" << insert_location.ibf_idx << ", " << insert_location.bin_idx << ")\n";
+    std::cerr << "rebuild_location: (" << rebuild_location.ibf_idx << ", " << rebuild_location.bin_idx << ")\n";
     if (rebuild_location.ibf_idx != std::numeric_limits<size_t>::max())
     {
-        std::cerr << "Partial Rebuild\n";
-        partial_rebuild(arguments, rebuild_location, index);
+        // tmax too high
+        if (!check_tmax_rebuild(arguments, index, rebuild_location.ibf_idx))
+        {
+            // some fpr too high
+            partial_rebuild(arguments, rebuild_location, index);
+        }
+    }
+    else
+    {
+        // tmax too high
+        check_tmax_rebuild(arguments, index, insert_location.ibf_idx);
     }
 
     // TODO: If possible, check whether a full rebuild is needed before doing the partial rebuild.
     // TODO: In original code there is a check in partial_rebuild. It shortcircuits if a full rebuild is needed.
-    if (index.ibf().ibf_vector[insert_location.ibf_idx].bin_count() > index.config().t_max)
-    {
-        if (insert_location.ibf_idx == 0u)
-        {
-            // full rebuild
-        }
-        else
-        {
-            // TODO: There is an option to toggle whether lower level tmax is important
-            // partial rebuild of previous ibf
-        }
-    }
+    // TODO: It also executes the rebuild...
+    // Should not be needed?
+    // if (index.ibf().ibf_vector[insert_location.ibf_idx].bin_count() > index.config().tmax)
+    // {
+    //     if (insert_location.ibf_idx == 0u)
+    //     {
+    //         // full rebuild
+    //     }
+    //     else
+    //     {
+    //         // TODO: There is an option to toggle whether lower level tmax is important
+    //         // partial rebuild of previous ibf
+    //     }
+    // }
 
-    dump_index(index);
+    // dump_index(index);
 
     //DEV
-    partial_rebuild(arguments, detail::rebuild_location{0, 9}, index);
+    // partial_rebuild(arguments, detail::rebuild_location{0, 9}, index);
 
     // size_t const ibf_idx = std::get<0>(index_triple);
     // check if rebuilding is needed because of exceeding the tmax

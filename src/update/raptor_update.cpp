@@ -9,6 +9,7 @@
 
 #include <fstream>
 
+#include <raptor/build/store_index.hpp>
 #include <raptor/index.hpp>
 #include <raptor/update/delete_user_bins.hpp>
 #include <raptor/update/dump_index.hpp>
@@ -36,6 +37,8 @@ void raptor_update(update_arguments const & arguments)
         insert_user_bin(arguments, index);
         dump_index(index);
     }
+
+    store_index(arguments.out_path, std::move(index));
 }
 
 } // namespace raptor

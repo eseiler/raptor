@@ -27,7 +27,7 @@ void init_update_parser(sharg::parser & parser, update_arguments & arguments)
                       sharg::config{.short_id = '\0',
                                     .long_id = "input",
                                     .description = "A file containing file names.",
-                                    .required = true,
+                                    // .required = true,
                                     .validator = sharg::input_file_validator{}});
     parser.add_option(arguments.index_file,
                       sharg::config{.short_id = '\0',
