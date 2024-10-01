@@ -263,7 +263,21 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
     {
         std::cerr << "Partial Rebuild\n";
         partial_rebuild(arguments, rebuild_location, index);
-        // Just construct an HIBF and attach it?
+    }
+
+    // TODO: If possible, check whether a full rebuild is needed before doing the partial rebuild.
+    // TODO: In original code there is a check in partial_rebuild. It shortcircuits if a full rebuild is needed.
+    if (index.ibf().ibf_vector[insert_location.ibf_idx].bin_count() > index.config().t_max)
+    {
+        if (insert_location.ibf_idx == 0u)
+        {
+            // full rebuild
+        }
+        else
+        {
+            // TODO: There is an option to toggle whether lower level tmax is important
+            // partial rebuild of previous ibf
+        }
     }
 
     dump_index(index);
