@@ -59,14 +59,6 @@ void dump_index(seqan::hibf::hierarchical_interleaved_bloom_filter const & hibf)
             sep = ',';
         }
         std::cerr << "]\n";
-        std::cerr << "  Occupied[" << ibf.occupied_bins.size() << "]:    [";
-        sep = {};
-        for (auto const val : ibf.occupied_bins)
-        {
-            std::cerr << sep << val;
-            sep = ',';
-        }
-        std::cerr << "]\n";
     }
     std::cerr << std::flush;
 }

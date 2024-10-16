@@ -23,7 +23,8 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers,
 {
     auto & ibf = index.ibf().ibf_vector[insert_location.ibf_idx];
 
-    seqan::hibf::build::insert_into_ibf(kmers,
+    seqan::hibf::build::insert_into_ibf(seqan::hibf::build::build_data{.config = index.config()},
+                                        kmers,
                                         insert_location.number_of_bins,
                                         insert_location.bin_idx,
                                         ibf,

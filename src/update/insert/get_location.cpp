@@ -48,9 +48,9 @@ find_empty_bin_idx(raptor_index<index_structure::hibf> & index, size_t const ibf
     auto & ibf = index.ibf().ibf_vector[ibf_idx];
     size_t const ibf_bin_count = [&]() -> size_t
     {
-        auto search_result = std::ranges::search_n(ibf.occupied_bins, number_of_bins, false);
+        auto search_result = std::ranges::search_n(ibf.occupancy, number_of_bins, 0u);
         if (!search_result.empty())
-            return std::ranges::distance(ibf.occupied_bins.begin(), search_result.begin());
+            return std::ranges::distance(ibf.occupancy.begin(), search_result.begin());
         return ibf.bin_count();
     }();
 
@@ -143,8 +143,7 @@ void update_bookkeeping(bookkeeping_arguments const & args, raptor_index<index_s
     size_t const new_number_of_bins = args.old_number_of_bins + args.number_of_new_bins;
     for (size_t i = args.old_number_of_bins; i < new_number_of_bins; ++i)
     {
-        ibf.occupancy[i] = 0u;
-        ibf.occupied_bins[i] = true;
+        ibf.occupancy[i] = 1u;
     }
     index.ibf().next_ibf_id[args.ibf_idx].resize(new_number_of_bins, args.ibf_idx);
     index.ibf().ibf_bin_to_user_bin_id[args.ibf_idx].resize(new_number_of_bins, index.ibf().number_of_user_bins);

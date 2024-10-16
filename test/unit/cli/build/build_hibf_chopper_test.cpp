@@ -75,11 +75,6 @@ TEST_F(build_hibf_layout, pipeline)
                 std::cout << val << ',';
             }
             std::cout << '\n';
-            for (auto val : ibf.occupied_bins)
-            {
-                std::cout << val << ',';
-            }
-            std::cout << '\n';
         }
     }
 

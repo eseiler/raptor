@@ -47,15 +47,19 @@ void delete_user_bins(update_arguments const & arguments, raptor_index<index_str
             for (auto const technical_bin_index : technical_bins_to_delete)
             {
                 ibf.occupancy[technical_bin_index.value] = 0u;
-                ibf.occupied_bins[technical_bin_index.value] = false;
             }
             [[maybe_unused]] bool const set_bin_count1 =
                 ibf.set_bin_count(seqan::hibf::bin_count{ibf.bin_count() - technical_bins_to_delete.size()});
             assert(set_bin_count1); // reducing bin count should always work
             // Either there is no occupied bin or there are still user bins. Both cannot be false or true at the same time.
-            assert(ibf.occupied_bins.none() ^ ibf.bin_count());
+            bool const all_zero = std::ranges::all_of(ibf.occupancy,
+                                                      [](size_t value)
+                                                      {
+                                                          return value == 0u;
+                                                      });
+            assert(all_zero ^ ibf.bin_count());
             // Delete in parent
-            if (ibf_index != 0 && ibf.occupied_bins.none())
+            if (ibf_index != 0 && all_zero)
             {
                 auto const parent = index.ibf().prev_ibf_id[ibf_index];
 
@@ -63,7 +67,6 @@ void delete_user_bins(update_arguments const & arguments, raptor_index<index_str
                 parent_ibf.clear(seqan::hibf::bin_index{parent.bin_idx});
 
                 parent_ibf.occupancy[parent.bin_idx] = 0u;
-                parent_ibf.occupied_bins[parent.bin_idx] = false;
                 ibf_bin_to_user_bin_id[parent.ibf_idx][parent.bin_idx] = seqan::hibf::bin_kind::deleted;
                 [[maybe_unused]] bool const set_bin_count2 =
                     parent_ibf.set_bin_count(seqan::hibf::bin_count{parent_ibf.bin_count() - 1u});
