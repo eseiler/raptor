@@ -25,4 +25,5 @@ jobs:
         with:
           token: ${{ github.token }}
           package_lock_file: cmake/package-lock.cmake
+          ignored_packages: google/googletest;google/benchmark
 
