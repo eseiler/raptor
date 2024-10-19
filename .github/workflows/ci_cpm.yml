@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2006-2024 Knut Reinert & Freie Universität Berlin
+# SPDX-FileCopyrightText: 2016-2024 Knut Reinert & MPI für molekulare Genetik
+# SPDX-License-Identifier: CC0-1.0
+
+name: Update CPM
+
+on:
+  workflow_dispatch:
+
+env:
+  TZ: Europe/Berlin
+
+defaults:
+  run:
+    shell: bash -Eeuxo pipefail {0}
+
+jobs:
+  update_cpm:
+    name: Update CPM
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run update
+        uses: eseiler/actions/update_cpm_package_lock@infra/update_cpm
+        with:
+          token: ${{ github.token }}
+          package_lock_file: ./cmake/package-lock.cmake
+
