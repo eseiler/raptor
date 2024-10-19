@@ -20,9 +20,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Run update
         uses: eseiler/actions/update_cpm_package_lock@infra/update_cpm
         with:
