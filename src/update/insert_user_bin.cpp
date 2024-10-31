@@ -119,7 +119,7 @@ void partial_rebuild(update_arguments const & arguments,
                      detail::rebuild_location const & rebuild_location,
                      raptor_index<index_structure::hibf> & index)
 {
-    std::cerr << "Partial Rebuild\n";
+    std::cout << "Partial Rebuild\n";
     assert(index.ibf().ibf_bin_to_user_bin_id[rebuild_location.ibf_idx][rebuild_location.bin_idx]
            == seqan::hibf::bin_kind::merged);
     size_t const child_ibf_id = index.ibf().next_ibf_id[rebuild_location.ibf_idx][rebuild_location.bin_idx];
@@ -259,7 +259,7 @@ bool check_tmax_rebuild(update_arguments const & arguments,
     {
         if (ibf_idx == 0u)
         {
-            std::cerr << "Full Rebuild\n";
+            std::cout << "Full Rebuild\n";
             // full rebuild
             auto bin_path = index.bin_path();
             auto const shape = index.shape();
@@ -316,6 +316,9 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
     // std::cerr << "rebuild_location: (" << rebuild_location.ibf_idx << ", " << rebuild_location.bin_idx << ")\n";
     if (rebuild_location.ibf_idx != std::numeric_limits<size_t>::max())
     {
+        // TODO: CHekc logic
+        // run_1024 only does partial rebuilds
+        // just doing check_tmax_rebuild leads to only inplace and then full_rebuild.
         // tmax too high
         if (!check_tmax_rebuild(arguments, index, rebuild_location.ibf_idx))
         {
