@@ -26,16 +26,16 @@ void raptor_update(update_arguments const & arguments)
     raptor::raptor_index<index_structure::hibf> index;
     archive(index);
 
-    dump_index(index);
+    // dump_index(index);
     if (!arguments.user_bins_to_delete.empty())
     {
         delete_user_bins(arguments, index);
-        dump_index(index);
+        // dump_index(index);
     }
     if (!arguments.user_bin_to_insert.empty())
     {
         insert_user_bin(arguments, index);
-        dump_index(index);
+        // dump_index(index);
     }
 
     store_index(arguments.out_path, std::move(index));

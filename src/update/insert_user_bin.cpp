@@ -253,7 +253,7 @@ bool check_tmax_rebuild(update_arguments const & arguments,
                         raptor_index<index_structure::hibf> & index,
                         size_t const ibf_idx)
 {
-    std::cerr << "check_tmax_rebuild\n";
+    // std::cerr << "check_tmax_rebuild\n";
     // TODO tmax is with empty bins subtracted
     if (index.ibf().ibf_vector[ibf_idx].bin_count() > seqan::hibf::next_multiple_of_64(index.config().tmax))
     {
@@ -312,8 +312,8 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
     index.append_bin_path({arguments.user_bin_to_insert}); // TODO: update_bookkeeping, but it doesn't have the args
     auto const rebuild_location = detail::insert_tb_and_parents(kmers, insert_location, index);
 
-    std::cerr << "insert_location: (" << insert_location.ibf_idx << ", " << insert_location.bin_idx << ")\n";
-    std::cerr << "rebuild_location: (" << rebuild_location.ibf_idx << ", " << rebuild_location.bin_idx << ")\n";
+    // std::cerr << "insert_location: (" << insert_location.ibf_idx << ", " << insert_location.bin_idx << ")\n";
+    // std::cerr << "rebuild_location: (" << rebuild_location.ibf_idx << ", " << rebuild_location.bin_idx << ")\n";
     if (rebuild_location.ibf_idx != std::numeric_limits<size_t>::max())
     {
         // tmax too high
