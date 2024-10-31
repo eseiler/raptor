@@ -251,11 +251,12 @@ static constexpr bool consider_lower_level_tmax{false};
 
 bool check_tmax_rebuild(update_arguments const & arguments,
                         raptor_index<index_structure::hibf> & index,
-                        size_t const ibf_idx)
+                        size_t const ibf_idx,
+                        bool const force = false)
 {
     // std::cerr << "check_tmax_rebuild\n";
     // TODO tmax is with empty bins subtracted
-    if (index.ibf().ibf_vector[ibf_idx].bin_count() > seqan::hibf::next_multiple_of_64(index.config().tmax))
+    if (force || index.ibf().ibf_vector[ibf_idx].bin_count() > seqan::hibf::next_multiple_of_64(index.config().tmax))
     {
         if (ibf_idx == 0u)
         {
@@ -316,14 +317,33 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
     // std::cerr << "rebuild_location: (" << rebuild_location.ibf_idx << ", " << rebuild_location.bin_idx << ")\n";
     if (rebuild_location.ibf_idx != std::numeric_limits<size_t>::max())
     {
-        // TODO: CHekc logic
-        // run_1024 only does partial rebuilds
-        // just doing check_tmax_rebuild leads to only inplace and then full_rebuild.
-        // tmax too high
         if (!check_tmax_rebuild(arguments, index, rebuild_location.ibf_idx))
         {
-            // some fpr too high
-            partial_rebuild(arguments, rebuild_location, index);
+            // std::cout << "insert_location: (" << insert_location.ibf_idx << ", " << insert_location.bin_idx << ")\n";
+            // std::cout << "rebuild_location: (" << rebuild_location.ibf_idx << ", " << rebuild_location.bin_idx << ")\n";
+            auto & ibf = index.ibf().ibf_vector[rebuild_location.ibf_idx];
+
+            auto compute_fpr = [](auto const & ibf, size_t const bin_idx)
+            {
+                double const exp_arg =
+                    (ibf.hash_function_count() * ibf.occupancy[bin_idx]) / static_cast<double>(ibf.bin_size());
+                double const log_arg = 1.0 - std::exp(-exp_arg);
+                return std::exp(ibf.hash_function_count() * std::log(log_arg));
+            };
+
+            auto const new_fpr = compute_fpr(ibf, rebuild_location.bin_idx);
+            bool const is_bin_merged = index.ibf().ibf_bin_to_user_bin_id[rebuild_location.ibf_idx][rebuild_location.bin_idx] == seqan::hibf::bin_kind::merged;
+            auto const target_fpr = is_bin_merged ? index.config().relaxed_fpr : index.fpr();
+            if (new_fpr > /*1.1 **/ target_fpr) // TODO lenience?
+            {
+                std::cout << "Forced ";
+                check_tmax_rebuild(arguments, index, rebuild_location.ibf_idx, true);
+            }
+            else
+            {
+                // some fpr too high
+                partial_rebuild(arguments, rebuild_location, index);
+            }
         }
     }
     else

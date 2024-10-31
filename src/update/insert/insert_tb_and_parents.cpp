@@ -23,13 +23,6 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers,
 {
     auto & ibf = index.ibf().ibf_vector[insert_location.ibf_idx];
 
-    seqan::hibf::build::insert_into_ibf(seqan::hibf::build::build_data{.config = index.config()},
-                                        kmers,
-                                        insert_location.number_of_bins,
-                                        insert_location.bin_idx,
-                                        ibf,
-                                        index.ibf().fill_ibf_timer);
-
     auto compute_fpr = [](auto const & ibf, size_t const bin_idx)
     {
         double const exp_arg =
@@ -38,12 +31,34 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers,
         return std::exp(ibf.hash_function_count() * std::log(log_arg));
     };
 
+    // std::cout << "\nIBF " << insert_location.ibf_idx << '\n';
+    // std::cout << "Bin " << insert_location.bin_idx << '\n';
+    // std::cout << "Insert " << insert_location.number_of_bins << " bins\n";
+
+    // std::cout << "Kmer content " << kmers.size() << '\n';
+    // std::cout << "FPR before " << compute_fpr(ibf, insert_location.bin_idx) << '\n';
+    // std::cout << "Occupancy before " << ibf.occupancy[insert_location.bin_idx] << '\n';
+
+    seqan::hibf::build::insert_into_ibf(seqan::hibf::build::build_data{.config = index.config()},
+                                        kmers,
+                                        insert_location.number_of_bins,
+                                        insert_location.bin_idx,
+                                        ibf,
+                                        index.ibf().fill_ibf_timer);
+
+    // std::cout << "Occupancy after " << ibf.occupancy[insert_location.bin_idx] << '\n';
+
+
+
     // TODO: Won't the kmers be evenly split? In this case, one computation is enough.
     // for (size_t i = insert_location.bin_idx; i < insert_location.bin_idx + insert_location.number_of_bins; ++i)
     // {
-    if (auto new_fpr = compute_fpr(ibf, insert_location.bin_idx); new_fpr > index.fpr())
+    auto const new_fpr = compute_fpr(ibf, insert_location.bin_idx);
+    bool const is_bin_merged = index.ibf().ibf_bin_to_user_bin_id[insert_location.ibf_idx][insert_location.bin_idx] == seqan::hibf::bin_kind::merged;
+    auto const target_fpr = is_bin_merged ? index.config().relaxed_fpr : index.fpr();
+    if (new_fpr > target_fpr)
     {
-        std::cout << new_fpr << " vs " << index.fpr() << '\n';
+        // std::cout << new_fpr << " vs " << target_fpr << '\n';
         rebuild_index_tuple.ibf_idx = insert_location.ibf_idx;
         rebuild_index_tuple.bin_idx = insert_location.bin_idx;
     }
