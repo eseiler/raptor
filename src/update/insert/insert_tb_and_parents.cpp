@@ -41,13 +41,12 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers,
     // TODO: Won't the kmers be evenly split? In this case, one computation is enough.
     // for (size_t i = insert_location.bin_idx; i < insert_location.bin_idx + insert_location.number_of_bins; ++i)
     // {
-        if (auto new_fpr = compute_fpr(ibf, insert_location.bin_idx); new_fpr > index.fpr())
-        {
-            std::cout << new_fpr << " vs " << index.fpr() << '\n';
-            rebuild_index_tuple.ibf_idx = insert_location.ibf_idx;
-            rebuild_index_tuple.bin_idx = insert_location.bin_idx;
-            break;
-        }
+    if (auto new_fpr = compute_fpr(ibf, insert_location.bin_idx); new_fpr > index.fpr())
+    {
+        std::cout << new_fpr << " vs " << index.fpr() << '\n';
+        rebuild_index_tuple.ibf_idx = insert_location.ibf_idx;
+        rebuild_index_tuple.bin_idx = insert_location.bin_idx;
+    }
     // }
 
     // TODO

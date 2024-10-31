@@ -6,11 +6,11 @@
 # This file should be committed to version control
 
 # hibf
-set (RAPTOR_HIBF_VERSION 2c1488a460c6a136332286f6efeaad26b1d8daac)
+set (RAPTOR_HIBF_VERSION 0f5dc35efefc0d463ab58b98bf8e533592f3d45c)
 CPMDeclarePackage (hibf
                    NAME hibf
-                   GIT_TAG ${RAPTOR_HIBF_VERSION} # main
-                   GITHUB_REPOSITORY seqan/hibf
+                   GIT_TAG ${RAPTOR_HIBF_VERSION} # feature/dynamic
+                   GITHUB_REPOSITORY eseiler/hibf
                    SYSTEM TRUE
                    EXCLUDE_FROM_ALL TRUE
                    OPTIONS "INSTALL_HIBF OFF"
@@ -36,11 +36,11 @@ CPMDeclarePackage (seqan3
                    OPTIONS "INSTALL_SEQAN3 OFF" "CMAKE_MESSAGE_LOG_LEVEL WARNING"
 )
 # chopper
-set (RAPTOR_CHOPPER_VERSION 655b4fe2b93d708ef91ae9676d400f4e6c75235e)
+set (RAPTOR_CHOPPER_VERSION 69494d30e6b85166b1514ff33eb68039be0b7fef)
 CPMDeclarePackage (chopper
                    NAME chopper
-                   GIT_TAG ${RAPTOR_CHOPPER_VERSION} # main
-                   GITHUB_REPOSITORY seqan/chopper
+                   GIT_TAG ${RAPTOR_CHOPPER_VERSION} # feature/dynamic
+                   GITHUB_REPOSITORY eseiler/chopper
                    SYSTEM TRUE
                    OPTIONS "CHOPPER_INSTALL OFF" "CHOPPER_BUILD_DOC OFF" "CHOPPER_BUILD_TEST OFF"
                            "CMAKE_MESSAGE_LOG_LEVEL WARNING"
