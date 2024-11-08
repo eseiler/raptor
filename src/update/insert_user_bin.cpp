@@ -15,6 +15,7 @@
 #include <raptor/index.hpp>
 #include <raptor/update/dump_index.hpp> // DEBUG
 
+#include "insert/is_fpr_exceeded.hpp"
 #include "insert/strong_types.hpp"
 
 namespace raptor::detail
@@ -249,45 +250,48 @@ void partial_rebuild(update_arguments const & arguments,
 
 static constexpr bool consider_lower_level_tmax{false};
 
+void full_rebuild(update_arguments const & arguments, raptor_index<index_structure::hibf> & index)
+{
+    std::cout << "Full Rebuild\n";
+    auto bin_path = index.bin_path();
+    auto const shape = index.shape();
+    auto const window_size = static_cast<uint32_t>(index.window_size());
+
+    auto input_fn = [&](size_t const user_bin_id, seqan::hibf::insert_iterator it)
+    {
+        raptor::file_reader<raptor::file_types::sequence> reader{shape, window_size};
+        reader.hash_into(bin_path[user_bin_id], it);
+    };
+
+    seqan::hibf::config config{index.config()};
+    config.tmax = 0u; //seqan::hibf::next_multiple_of_64(config.tmax + 64u);
+    config.input_fn = std::move(input_fn);
+    config.number_of_user_bins = bin_path.size();
+    config.threads = arguments.threads;
+    config.validated = false;
+    config.validate_and_set_defaults();
+
+    index = {};
+    seqan::hibf::hierarchical_interleaved_bloom_filter hibf{config};
+    index = raptor_index<index_structure::hibf>{window{window_size},
+                                                shape,
+                                                1u,
+                                                std::move(bin_path),
+                                                config,
+                                                std::move(hibf)};
+}
+
 bool check_tmax_rebuild(update_arguments const & arguments,
                         raptor_index<index_structure::hibf> & index,
-                        size_t const ibf_idx,
-                        bool const force = false)
+                        size_t const ibf_idx)
 {
     // std::cerr << "check_tmax_rebuild\n";
     // TODO tmax is with empty bins subtracted
-    if (force || index.ibf().ibf_vector[ibf_idx].bin_count() > seqan::hibf::next_multiple_of_64(index.config().tmax))
+    if (index.ibf().ibf_vector[ibf_idx].bin_count() > seqan::hibf::next_multiple_of_64(index.config().tmax))
     {
         if (ibf_idx == 0u)
         {
-            std::cout << "Full Rebuild\n";
-            // full rebuild
-            auto bin_path = index.bin_path();
-            auto const shape = index.shape();
-            auto const window_size = static_cast<uint32_t>(index.window_size());
-
-            auto input_fn = [&](size_t const user_bin_id, seqan::hibf::insert_iterator it)
-            {
-                raptor::file_reader<raptor::file_types::sequence> reader{shape, window_size};
-                reader.hash_into(bin_path[user_bin_id], it);
-            };
-
-            seqan::hibf::config config{index.config()};
-            config.tmax = 0u; //seqan::hibf::next_multiple_of_64(config.tmax + 64u);
-            config.input_fn = std::move(input_fn);
-            config.number_of_user_bins = bin_path.size();
-            config.threads = arguments.threads;
-            config.validated = false;
-            config.validate_and_set_defaults();
-
-            index = {};
-            seqan::hibf::hierarchical_interleaved_bloom_filter hibf{config};
-            index = raptor_index<index_structure::hibf>{window{window_size},
-                                                        shape,
-                                                        1u,
-                                                        std::move(bin_path),
-                                                        config,
-                                                        std::move(hibf)};
+            full_rebuild(arguments, index);
         }
         else if constexpr (consider_lower_level_tmax)
         {
@@ -321,27 +325,13 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
         {
             // std::cout << "insert_location: (" << insert_location.ibf_idx << ", " << insert_location.bin_idx << ")\n";
             // std::cout << "rebuild_location: (" << rebuild_location.ibf_idx << ", " << rebuild_location.bin_idx << ")\n";
-            auto & ibf = index.ibf().ibf_vector[rebuild_location.ibf_idx];
-
-            auto compute_fpr = [](auto const & ibf, size_t const bin_idx)
+            if (rebuild_location.ibf_idx == 0u && is_fpr_exceeded(index, rebuild_location))
             {
-                double const exp_arg =
-                    (ibf.hash_function_count() * ibf.occupancy[bin_idx]) / static_cast<double>(ibf.bin_size());
-                double const log_arg = 1.0 - std::exp(-exp_arg);
-                return std::exp(ibf.hash_function_count() * std::log(log_arg));
-            };
-
-            auto const new_fpr = compute_fpr(ibf, rebuild_location.bin_idx);
-            bool const is_bin_merged = index.ibf().ibf_bin_to_user_bin_id[rebuild_location.ibf_idx][rebuild_location.bin_idx] == seqan::hibf::bin_kind::merged;
-            auto const target_fpr = is_bin_merged ? index.config().relaxed_fpr : index.fpr();
-            if (new_fpr > /*1.1 **/ target_fpr) // TODO lenience?
-            {
-                std::cout << "Forced ";
-                check_tmax_rebuild(arguments, index, rebuild_location.ibf_idx, true);
+                full_rebuild(arguments, index);
             }
             else
             {
-                // some fpr too high
+                // some downstream fpr too high
                 partial_rebuild(arguments, rebuild_location, index);
             }
         }

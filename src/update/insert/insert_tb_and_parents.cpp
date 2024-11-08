@@ -11,6 +11,7 @@
 
 #include <raptor/index.hpp>
 
+#include "is_fpr_exceeded.hpp"
 #include "strong_types.hpp"
 
 namespace raptor::detail
@@ -22,14 +23,6 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers,
                      rebuild_location & rebuild_index_tuple)
 {
     auto & ibf = index.ibf().ibf_vector[insert_location.ibf_idx];
-
-    auto compute_fpr = [](auto const & ibf, size_t const bin_idx)
-    {
-        double const exp_arg =
-            (ibf.hash_function_count() * ibf.occupancy[bin_idx]) / static_cast<double>(ibf.bin_size());
-        double const log_arg = 1.0 - std::exp(-exp_arg);
-        return std::exp(ibf.hash_function_count() * std::log(log_arg));
-    };
 
     // std::cout << "\nIBF " << insert_location.ibf_idx << '\n';
     // std::cout << "Bin " << insert_location.bin_idx << '\n';
@@ -48,15 +41,10 @@ void insert_into_ibf(robin_hood::unordered_flat_set<size_t> const & kmers,
 
     // std::cout << "Occupancy after " << ibf.occupancy[insert_location.bin_idx] << '\n';
 
-
-
     // TODO: Won't the kmers be evenly split? In this case, one computation is enough.
     // for (size_t i = insert_location.bin_idx; i < insert_location.bin_idx + insert_location.number_of_bins; ++i)
     // {
-    auto const new_fpr = compute_fpr(ibf, insert_location.bin_idx);
-    bool const is_bin_merged = index.ibf().ibf_bin_to_user_bin_id[insert_location.ibf_idx][insert_location.bin_idx] == seqan::hibf::bin_kind::merged;
-    auto const target_fpr = is_bin_merged ? index.config().relaxed_fpr : index.fpr();
-    if (new_fpr > target_fpr)
+    if (is_fpr_exceeded(index, insert_location))
     {
         // std::cout << new_fpr << " vs " << target_fpr << '\n';
         rebuild_index_tuple.ibf_idx = insert_location.ibf_idx;
