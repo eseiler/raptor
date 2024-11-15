@@ -264,7 +264,7 @@ void full_rebuild(update_arguments const & arguments, raptor_index<index_structu
     };
 
     seqan::hibf::config config{index.config()};
-    config.tmax = 0u; //seqan::hibf::next_multiple_of_64(config.tmax + 64u);
+    config.tmax = seqan::hibf::next_multiple_of_64(config.tmax);
     config.input_fn = std::move(input_fn);
     config.number_of_user_bins = bin_path.size();
     config.threads = arguments.threads;
