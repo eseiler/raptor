@@ -11,6 +11,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <iostream>
 
 #include <raptor/index.hpp>
 
@@ -42,8 +43,13 @@ inline bool is_fpr_exceeded_impl(raptor_index<index_structure::hibf> const & ind
             return index.fpr();
 
         double const relaxed_fpr = index.config().relaxed_fpr;
-        return relaxed_fpr * (is_toplevel ? std::min(relaxed_fpr * 1.25, std::max(relaxed_fpr, 0.95)) : 1.0);
+        // TODO: x2
+        return std::min(relaxed_fpr * 1.25, std::max(relaxed_fpr, 0.95));
+        // return is_toplevel ? std::min(relaxed_fpr * 1.25, std::max(relaxed_fpr, 0.95)) : relaxed_fpr;
     }();
+
+    // if (new_fpr > target_fpr)
+        // std::cerr << "[DEBUG] New FPR: " << new_fpr << "\n        Target FPR: " << target_fpr << '\n';
 
     return new_fpr > target_fpr;
 }

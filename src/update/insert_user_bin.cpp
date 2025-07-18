@@ -261,6 +261,9 @@ void full_rebuild(update_arguments const & arguments, raptor_index<index_structu
     config.number_of_user_bins = bin_path.size();
     config.threads = arguments.threads;
     config.validate_and_set_defaults();
+    // std::cout << '\n';
+    // config.write_to(std::cout);
+    // std::cout << '\n';
 
     index = {};
     seqan::hibf::hierarchical_interleaved_bloom_filter hibf{config};
@@ -309,6 +312,9 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
                                  arguments.user_bins_to_insert.begin(),
                                  arguments.user_bins_to_insert.end());
 
+    // std::cerr << "[DEBUG] Current bins[1]: " << index.ibf().ibf_vector[1].bin_count() << '\n';
+    // std::cerr << "[DEBUG] Current tb[1]: " << index.ibf().ibf_vector[1].technical_bins << '\n';
+
     for (auto const & ub : arguments.user_bins_to_insert)
     {
         if (ub.size() > 1u)
@@ -325,6 +331,7 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
             auto const insert_location = detail::get_location(max_kmers, kmer_count, index);
             index.append_bin_path({path}); // TODO: update_bookkeeping, but it doesn't have the args
             auto const rebuild_location = detail::insert_tb_and_parents(kmers, insert_location, index);
+            bool debug = false;
 
             if (rebuild_location.ibf_idx != std::numeric_limits<size_t>::max())
             {
@@ -332,12 +339,16 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
                 {
                     if (rebuild_location.ibf_idx == 0u && is_fpr_exceeded(index, rebuild_location))
                     {
+                        debug = true;
+                        // std::cerr << "[DEBUG] FPR exceeded in top-level IBF, performing full rebuild.\n";
                         index.replace_bin_path(std::move(full_rebuild_bin_path));
                         full_rebuild(arguments, index);
                         return;
                     }
                     else
                     {
+                        debug = true;
+                        // std::cerr << "[DEBUG] Partial rebuild.\n";
                         // some downstream fpr too high
                         partial_rebuild(arguments, rebuild_location, index);
                     }
@@ -348,11 +359,16 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
                 // tmax too high
                 if (check_tmax_rebuild(arguments, index, insert_location.ibf_idx) == tmax_check::full_rebuild)
                 {
+                    debug = true;
+                    // std::cerr << "[DEBUG] Tmax too high, performing full rebuild.\n";
                     index.replace_bin_path(std::move(full_rebuild_bin_path));
                     full_rebuild(arguments, index);
                     return;
                 }
             }
+
+            // if (!debug)
+            //     std::cerr << "[DEBUG] Inplace.\n";
         }
     }
 
