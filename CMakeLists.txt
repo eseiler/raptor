@@ -24,7 +24,7 @@ include (${CMAKE_CURRENT_LIST_DIR}/cmake/configuration.cmake)
 
 add_subdirectory (src)
 
-option (INSTALL_RAPTOR "Enable installation of Raptor." ON)
+option (INSTALL_RAPTOR "Enable installation of Raptor." OFF)
 
 if (INSTALL_RAPTOR)
     include (GNUInstallDirs)

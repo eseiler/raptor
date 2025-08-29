@@ -4,6 +4,14 @@
 
 cmake_minimum_required (VERSION 3.25...3.30)
 
+add_executable ("upgrade" upgrade.cpp)
+target_link_libraries ("upgrade" PUBLIC "raptor::interface")
+set_property (TARGET upgrade PROPERTY RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+
+return ()
+
+#########################
+
 if (TARGET raptor)
     return ()
 endif ()
