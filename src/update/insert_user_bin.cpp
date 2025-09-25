@@ -243,7 +243,7 @@ static constexpr bool consider_lower_level_tmax{false};
 
 void full_rebuild(update_arguments const & arguments, raptor_index<index_structure::hibf> & index)
 {
-    std::cout << "Full Rebuild\n";
+    // std::cout << "Full Rebuild\n";
     auto bin_path = index.bin_path();
     auto const shape = index.shape();
     auto const window_size = static_cast<uint32_t>(index.window_size());
@@ -331,7 +331,7 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
             auto const insert_location = detail::get_location(max_kmers, kmer_count, index);
             index.append_bin_path({path}); // TODO: update_bookkeeping, but it doesn't have the args
             auto const rebuild_location = detail::insert_tb_and_parents(kmers, insert_location, index);
-            bool debug = false;
+            [[maybe_unused]] bool debug = false;
 
             if (rebuild_location.ibf_idx != std::numeric_limits<size_t>::max())
             {
@@ -340,7 +340,7 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
                     if (rebuild_location.ibf_idx == 0u && is_fpr_exceeded(index, rebuild_location))
                     {
                         debug = true;
-                        // std::cerr << "[DEBUG] FPR exceeded in top-level IBF, performing full rebuild.\n";
+                        std::cout << "Full Rebuild FPR\n";
                         index.replace_bin_path(std::move(full_rebuild_bin_path));
                         full_rebuild(arguments, index);
                         return;
@@ -348,7 +348,7 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
                     else
                     {
                         debug = true;
-                        // std::cerr << "[DEBUG] Partial rebuild.\n";
+                        // std::cout << "[DEBUG] Partial rebuild.\n";
                         // some downstream fpr too high
                         partial_rebuild(arguments, rebuild_location, index);
                     }
@@ -360,7 +360,7 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
                 if (check_tmax_rebuild(arguments, index, insert_location.ibf_idx) == tmax_check::full_rebuild)
                 {
                     debug = true;
-                    // std::cerr << "[DEBUG] Tmax too high, performing full rebuild.\n";
+                    std::cout << "Full Rebuild tmax\n";
                     index.replace_bin_path(std::move(full_rebuild_bin_path));
                     full_rebuild(arguments, index);
                     return;

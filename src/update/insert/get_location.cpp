@@ -56,7 +56,7 @@ find_empty_bin_idx(raptor_index<index_structure::hibf> & index, size_t const ibf
 
     // If nothing has been returned, no appropriate empty bin has been found and the bin idx will be the size of the IBF,
     size_t const new_bin_count{ibf_bin_count + number_of_bins};
-    size_t const orig = ibf.bin_count();
+    [[maybe_unused]] size_t const orig = ibf.bin_count();
     // If we can increase the number of bins without resizing the underlying bitvector
     if (ibf.try_increase_bin_number_to(seqan::hibf::bin_count{new_bin_count}))
     {
@@ -106,9 +106,10 @@ ibf_location find_ibf_size_splitting(std::vector<ibf_max> const & max_ibf_sizes,
                                      .hash_count = ibf.hash_function_count(),
                                      .max_elements = max_ibf_sizes[ibf_size_idx].max_elements});
 
-        if (size_t const bin_idx = find_empty_bin_idx(index, ibf_idx, number_of_bins); bin_idx != std::numeric_limits<size_t>::max())
+        if (size_t const bin_idx = find_empty_bin_idx(index, ibf_idx, number_of_bins);
+            bin_idx != std::numeric_limits<size_t>::max())
         {
-            size_t const parent_ibf_idx = index.ibf().prev_ibf_id[ibf_idx].ibf_idx;
+            [[maybe_unused]] size_t const parent_ibf_idx = index.ibf().prev_ibf_id[ibf_idx].ibf_idx;
             // std::cerr << "[DEBUG] Case 1: " << ibf_idx << ' ' << parent_ibf_idx << '\n';
             return {.ibf_idx = ibf_idx, .bin_idx = bin_idx, .max_elements = max_ibf_sizes[ibf_size_idx].max_elements};
         }
@@ -126,13 +127,21 @@ ibf_location find_ibf_size_splitting(std::vector<ibf_max> const & max_ibf_sizes,
         // this should trigger a resize and partial rebuild down the stream.
         if (parent_ibf_idx != 0)
         {
-            if (size_t const bin_idx = find_empty_bin_idx(index, parent_ibf_idx, 1); bin_idx != std::numeric_limits<size_t>::max())
+            if (size_t const bin_idx = find_empty_bin_idx(index, parent_ibf_idx, 1);
+                bin_idx != std::numeric_limits<size_t>::max())
             {
                 // this triggers resizing of the same ibf and leads to exceeding fpr -> full rebuild
                 // return {.ibf_idx = ibf_idx, .max_elements = max_ibf_sizes[ibf_size_idx].max_elements};
                 // std::cerr << "[DEBUG] Case 2: " << ibf_idx << '\n';
-                auto result = std::ranges::find_if(max_ibf_sizes, [parent_ibf_idx](ibf_max const & m) { return m.ibf_idx == parent_ibf_idx; });
-                return {.ibf_idx = parent_ibf_idx, .bin_idx = bin_idx, .max_elements = max_ibf_sizes[std::ranges::distance(max_ibf_sizes.begin(), result)].max_elements};
+                auto result = std::ranges::find_if(max_ibf_sizes,
+                                                   [parent_ibf_idx](ibf_max const & m)
+                                                   {
+                                                       return m.ibf_idx == parent_ibf_idx;
+                                                   });
+                return {.ibf_idx = parent_ibf_idx,
+                        .bin_idx = bin_idx,
+                        .max_elements =
+                            max_ibf_sizes[std::ranges::distance(max_ibf_sizes.begin(), result)].max_elements};
             }
         }
 
@@ -141,10 +150,13 @@ ibf_location find_ibf_size_splitting(std::vector<ibf_max> const & max_ibf_sizes,
              ++ibf_size_idx)
         {
             ibf_idx = max_ibf_sizes[ibf_size_idx].ibf_idx;
-            if (size_t const bin_idx = find_empty_bin_idx(index, ibf_idx, 1); bin_idx != std::numeric_limits<size_t>::max())
+            if (size_t const bin_idx = find_empty_bin_idx(index, ibf_idx, 1);
+                bin_idx != std::numeric_limits<size_t>::max())
             {
                 // std::cerr << "[DEBUG] Case 3: " << ibf_idx << '\n';
-                return {.ibf_idx = ibf_idx, .bin_idx = bin_idx, .max_elements = max_ibf_sizes[ibf_size_idx].max_elements};
+                return {.ibf_idx = ibf_idx,
+                        .bin_idx = bin_idx,
+                        .max_elements = max_ibf_sizes[ibf_size_idx].max_elements};
             }
         }
 
@@ -160,8 +172,8 @@ ibf_location find_ibf_size_splitting(std::vector<ibf_max> const & max_ibf_sizes,
         ibf_idx = max_ibf_sizes[ibf_size_idx].ibf_idx;
     }
 
-    // Any
-    #if 1
+// Any
+#if 1
     ibf_size_idx = binary_search_index;
     for (; ibf_size_idx < number_of_ibfs; ++ibf_size_idx)
     {
@@ -172,7 +184,7 @@ ibf_location find_ibf_size_splitting(std::vector<ibf_max> const & max_ibf_sizes,
             return {.ibf_idx = ibf_idx, .bin_idx = bin_idx, .max_elements = max_ibf_sizes[ibf_size_idx].max_elements};
         }
     }
-    #endif
+#endif
 
     // if (ibf_size_idx == number_of_ibfs)
     // {
@@ -182,9 +194,15 @@ ibf_location find_ibf_size_splitting(std::vector<ibf_max> const & max_ibf_sizes,
 
     // a full rebuild will be triggered.
     // std::cerr << "[DEBUG] Case 7: 0\n";
-    auto result = std::ranges::find_if(max_ibf_sizes, [](ibf_max const & m) { return m.ibf_idx == 0; });
+    auto result = std::ranges::find_if(max_ibf_sizes,
+                                       [](ibf_max const & m)
+                                       {
+                                           return m.ibf_idx == 0;
+                                       });
     uint64_t bin_idx = find_empty_bin_idx(index, 0, 1);
-    return {.ibf_idx = 0, .bin_idx = bin_idx, .max_elements = max_ibf_sizes[std::ranges::distance(max_ibf_sizes.begin(), result)].max_elements};
+    return {.ibf_idx = 0,
+            .bin_idx = bin_idx,
+            .max_elements = max_ibf_sizes[std::ranges::distance(max_ibf_sizes.begin(), result)].max_elements};
 }
 
 void update_bookkeeping(bookkeeping_arguments const & args, raptor_index<index_structure::hibf> & index)
