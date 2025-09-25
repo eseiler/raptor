@@ -113,7 +113,6 @@ void partial_rebuild(update_arguments const & arguments,
                      detail::rebuild_location const & rebuild_location,
                      raptor_index<index_structure::hibf> & index)
 {
-    std::cout << "Partial Rebuild\n";
     assert(index.ibf().ibf_bin_to_user_bin_id[rebuild_location.ibf_idx][rebuild_location.bin_idx]
            == seqan::hibf::bin_kind::merged);
     size_t const child_ibf_id = index.ibf().next_ibf_id[rebuild_location.ibf_idx][rebuild_location.bin_idx];
@@ -239,7 +238,7 @@ void partial_rebuild(update_arguments const & arguments,
     }
 }
 
-static constexpr bool consider_lower_level_tmax{false};
+static constexpr bool consider_lower_level_tmax{true};
 
 void full_rebuild(update_arguments const & arguments, raptor_index<index_structure::hibf> & index)
 {
@@ -286,20 +285,18 @@ tmax_check check_tmax_rebuild(update_arguments const & arguments,
                               raptor_index<index_structure::hibf> & index,
                               size_t const ibf_idx)
 {
-    if (index.ibf().ibf_vector[ibf_idx].bin_count() > seqan::hibf::next_multiple_of_64(index.config().tmax))
-    {
-        if (ibf_idx == 0u)
-        {
-            return tmax_check::full_rebuild;
-        }
-        else if constexpr (consider_lower_level_tmax)
-        {
-            auto const parent = index.ibf().prev_ibf_id[ibf_idx];
-            partial_rebuild(arguments, detail::rebuild_location{parent.ibf_idx, parent.bin_idx}, index);
-            return tmax_check::partial_rebuild;
-        }
+    (void)arguments;
+    auto const bin_count = index.ibf().ibf_vector[ibf_idx].bin_count();
 
-        return tmax_check::no_rebuild;
+    if (ibf_idx == 0)
+    {
+        if (bin_count > index.config().tmax)
+            return tmax_check::full_rebuild;
+    }
+    else if constexpr (consider_lower_level_tmax)
+    {
+        if (bin_count > index.config().tmax + 64u)
+            return tmax_check::partial_rebuild;
     }
 
     return tmax_check::no_rebuild;
@@ -350,20 +347,29 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
                         debug = true;
                         // std::cout << "[DEBUG] Partial rebuild.\n";
                         // some downstream fpr too high
+                        std::cout << "Partial Rebuild FPR\n";
                         partial_rebuild(arguments, rebuild_location, index);
                     }
                 }
             }
             else
             {
+                auto result = check_tmax_rebuild(arguments, index, insert_location.ibf_idx);
                 // tmax too high
-                if (check_tmax_rebuild(arguments, index, insert_location.ibf_idx) == tmax_check::full_rebuild)
+                if (result == tmax_check::full_rebuild)
                 {
                     debug = true;
                     std::cout << "Full Rebuild tmax\n";
                     index.replace_bin_path(std::move(full_rebuild_bin_path));
                     full_rebuild(arguments, index);
                     return;
+                }
+
+                if (result == tmax_check::partial_rebuild)
+                {
+                    auto const parent = index.ibf().prev_ibf_id[insert_location.ibf_idx];
+                    std::cout << "Partial Rebuild tmax\n";
+                    partial_rebuild(arguments, detail::rebuild_location{parent.ibf_idx, parent.bin_idx}, index);
                 }
             }
 
