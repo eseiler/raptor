@@ -58,9 +58,14 @@ std::vector<ibf_max> max_ibf_sizes(raptor_index<index_structure::hibf> const & i
     auto const & ibf_vector = index.ibf().ibf_vector;
     std::vector<ibf_max> max_sizes{};
     max_sizes.reserve(ibf_vector.size());
+    seqan::hibf::hierarchical_interleaved_bloom_filter::previous_ibf_id_pair const invalid{
+        seqan::hibf::bin_kind::deleted,
+        seqan::hibf::bin_kind::deleted};
 
     for (size_t i = 0; i < ibf_vector.size(); ++i)
     {
+        if (index.ibf().prev_ibf_id[i] == invalid)
+            continue;
         auto const & ibf = ibf_vector[i];
         size_t const max_kmers = max_elements({.fpr = index.fpr(), //
                                                .hash_count = ibf.hash_function_count(),
@@ -163,6 +168,9 @@ void partial_rebuild(update_arguments const & arguments,
 
     // Handle the first IBF
     original_hibf.ibf_vector[child_ibf_id] = std::move(subindex.ibf_vector[0]);
+    index.is_resized[child_ibf_id] = true; // false
+
+    index.is_resized.resize(index.is_resized.size() + subindex.ibf_vector.size(), true);
 
     auto & first_ibf_next_ibf_id = subindex.next_ibf_id[0];
     std::ranges::for_each(first_ibf_next_ibf_id,
