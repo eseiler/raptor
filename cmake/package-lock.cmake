@@ -11,8 +11,8 @@
 set (RAPTOR_HIBF_VERSION bbca76409f5445f1404c206021fcfa37f1fd7054 CACHE STRING "")
 CPMDeclarePackage (hibf
                    NAME hibf
-                   GIT_TAG ${RAPTOR_HIBF_VERSION} # main
-                   GITHUB_REPOSITORY seqan/hibf
+                   GIT_TAG ${RAPTOR_HIBF_VERSION} # fix/dynamic
+                   GITHUB_REPOSITORY eseiler/hibf
                    SYSTEM TRUE
                    EXCLUDE_FROM_ALL TRUE
                    OPTIONS "INSTALL_HIBF OFF"
