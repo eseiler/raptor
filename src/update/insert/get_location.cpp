@@ -45,6 +45,7 @@ size_t find_empty_bin_idx(raptor_index<index_structure::hibf> & index,
                           size_t const number_of_bins,
                           uint8_t const extend_tmax)
 {
+    (void)extend_tmax;
     // TODO: Increase more if empty_bin_fraction not satisfied
     // [[maybe_unused]] static constexpr double empty_bin_fraction = 0.0001; //TODO store in index
     auto & ibf = index.ibf().ibf_vector[ibf_idx];
@@ -68,13 +69,17 @@ size_t find_empty_bin_idx(raptor_index<index_structure::hibf> & index,
         // std::cerr << "[DEBUG] now[" << ibf_idx << "]: " << ibf.bin_count() << '\n';
         return ibf_bin_count;
     }
-    if (extend_tmax != 0 && ibf_idx != 0)
+    if (ibf_idx != 0 && extend_tmax != 0u && !index.is_resized[ibf_idx])
     {
-        if (index.config().tmax + 64u * extend_tmax >= new_bin_count)
-        {
-            ibf.increase_bin_number_to(seqan::hibf::bin_count{new_bin_count});
-            return ibf_bin_count;
-        }
+        index.is_resized[ibf_idx] = true;
+        ibf.increase_bin_number_to(seqan::hibf::bin_count{new_bin_count});
+        return ibf_bin_count;
+
+        // if (index.config().tmax + 64u * extend_tmax >= new_bin_count)
+        // {
+        //     ibf.increase_bin_number_to(seqan::hibf::bin_count{new_bin_count});
+        //     return ibf_bin_count;
+        // }
 
         // if (new_bin_count - seqan::hibf::next_multiple_of_64(index.config().tmax) <= 64u)
         // {
@@ -191,6 +196,9 @@ ibf_location find_ibf_size_splitting(std::vector<ibf_max> const & max_ibf_sizes,
             ibf_idx = max_ibf_sizes[ibf_size_idx].ibf_idx;
         }
 
+        if (!extend_tmax)
+            return std::nullopt;
+
 // Any
 #if 1
         ibf_size_idx = binary_search_index;
@@ -225,11 +233,10 @@ ibf_location find_ibf_size_splitting(std::vector<ibf_max> const & max_ibf_sizes,
     if (auto const result = kernel(1); result.has_value())
         return result.value();
 
-
     // TODO I need to track and only allow each ibf to be partially rebuild once.
 
-    if (auto const result = kernel(2); result.has_value())
-        return result.value();
+    // if (auto const result = kernel(2); result.has_value())
+    //     return result.value();
 
     auto result = std::ranges::find_if(max_ibf_sizes,
                                        [](ibf_max const & m)
@@ -281,6 +288,7 @@ insert_location get_location(std::vector<ibf_max> const & max_ibf_sizes,
     // The current solution resizes the IBF here, but it would be more efficient to check the tmax function after calculating the new bin count and perhaps trigger a partial rebuild dirctly.
     if (bin_idx == std::numeric_limits<size_t>::max())
     {
+        index.is_resized[ibf_idx] = true;
         bin_idx = ibf.bin_count();
         // std::cerr << "[DEBUG] Forced increase[" << ibf_idx << "]: " << bin_idx << " to " << bin_idx + number_of_bins << '\n';
         ibf.increase_bin_number_to(seqan::hibf::bin_count{bin_idx + number_of_bins});

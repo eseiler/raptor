@@ -43,6 +43,7 @@ inline bool is_fpr_exceeded_impl(raptor_index<index_structure::hibf> const & ind
             return index.fpr();
 
         double const relaxed_fpr = index.config().relaxed_fpr;
+        // double const factor = level == 0u ? 2.0 : 1.25; //1.0 + 1.0 / ((level + 1u) * (level + 1u));
         double const factor = 1.0 + 1.0 / ((level + 1u) * (level + 1u));
         // Just `/ (level + 1u)` did not cause partial rebuilds
         // TODO: x2
@@ -58,7 +59,8 @@ inline bool is_fpr_exceeded_impl(raptor_index<index_structure::hibf> const & ind
 
 inline bool is_fpr_exceeded(raptor_index<index_structure::hibf> const & index, insert_location const & insert_location)
 {
-    size_t const level = [&](){
+    size_t const level = [&]()
+    {
         size_t level{};
         size_t ibf_idx = insert_location.ibf_idx;
         while (ibf_idx != 0u)
