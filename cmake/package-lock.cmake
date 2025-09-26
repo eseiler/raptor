@@ -8,11 +8,11 @@
 # cmake-format: off
 
 # hibf
-set (RAPTOR_HIBF_VERSION 101a00d86098907436f4eb67835bb744c2405b32 CACHE STRING "")
+set (RAPTOR_HIBF_VERSION 0179f6d7320910bfa058c87e493eab5f46e692c3 CACHE STRING "")
 CPMDeclarePackage (hibf
                    NAME hibf
-                   GIT_TAG ${RAPTOR_HIBF_VERSION} # main
-                   GITHUB_REPOSITORY seqan/hibf
+                   GIT_TAG ${RAPTOR_HIBF_VERSION} # fix/dynamic
+                   GITHUB_REPOSITORY eseiler/hibf
                    SYSTEM TRUE
                    EXCLUDE_FROM_ALL TRUE
                    OPTIONS "INSTALL_HIBF OFF"
