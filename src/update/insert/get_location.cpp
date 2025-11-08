@@ -58,6 +58,7 @@ size_t find_empty_bin_idx(raptor_index<index_structure::hibf> & index,
     }();
 
     // If nothing has been returned, no appropriate empty bin has been found and the bin idx will be the size of the IBF,
+    // BUG: Deleted bins!
     size_t const new_bin_count{ibf_bin_count + number_of_bins};
     [[maybe_unused]] size_t const orig = ibf.bin_count();
     // If we can increase the number of bins without resizing the underlying bitvector
@@ -69,7 +70,7 @@ size_t find_empty_bin_idx(raptor_index<index_structure::hibf> & index,
         // std::cerr << "[DEBUG] now[" << ibf_idx << "]: " << ibf.bin_count() << '\n';
         return ibf_bin_count;
     }
-    if (ibf_idx != 0 && extend_tmax != 0u && !index.is_resized[ibf_idx])
+    if (ibf_idx != 0 && extend_tmax != 0u && !index.is_resized[ibf_idx] && new_bin_count <= ibf.occupancy.size() * extend_tmax)
     {
         index.is_resized[ibf_idx] = true;
         ibf.increase_bin_number_to(seqan::hibf::bin_count{new_bin_count});
@@ -230,7 +231,7 @@ ibf_location find_ibf_size_splitting(std::vector<ibf_max> const & max_ibf_sizes,
 
     // a full rebuild will be triggered.
     // std::cerr << "[DEBUG] Case 7: 0\n";
-    if (auto const result = kernel(1); result.has_value())
+    if (auto const result = kernel(2); result.has_value())
         return result.value();
 
     // TODO I need to track and only allow each ibf to be partially rebuild once.
