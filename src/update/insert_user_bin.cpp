@@ -303,7 +303,7 @@ tmax_check check_tmax_rebuild(update_arguments const & arguments,
     }
     else if constexpr (consider_lower_level_tmax)
     {
-        if (bin_count > index.config().tmax + 64u)
+        if (bin_count > index.config().tmax * 2uz)
             return tmax_check::partial_rebuild;
     }
 
