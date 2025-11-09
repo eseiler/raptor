@@ -303,7 +303,7 @@ tmax_check check_tmax_rebuild(update_arguments const & arguments,
     }
     else if constexpr (consider_lower_level_tmax)
     {
-        if (bin_count > index.config().tmax * 2uz)
+        if (bin_count > index.config().tmax + 64uz)
             return tmax_check::partial_rebuild;
     }
 
@@ -334,17 +334,18 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
             assert(std::ranges::is_sorted(max_kmers));
 
             auto const insert_location = detail::get_location(max_kmers, kmer_count, index);
+            // TODO full rebuild already here? Don't need to insert it first...
+            // Let above return a std::optional. If valueless, do full rebuild
             index.append_bin_path({path}); // TODO: update_bookkeeping, but it doesn't have the args
             auto const rebuild_location = detail::insert_tb_and_parents(kmers, insert_location, index);
-            [[maybe_unused]] bool debug = false;
-
+            // Also make above a std::optional
+            // If valueless, FPR wasn't exceeded...can the root-ibf check be incorporated?
             if (rebuild_location.ibf_idx != std::numeric_limits<size_t>::max())
             {
                 if (check_tmax_rebuild(arguments, index, rebuild_location.ibf_idx) == tmax_check::no_rebuild)
                 {
                     if (rebuild_location.ibf_idx == 0u && is_fpr_exceeded(index, rebuild_location))
                     {
-                        debug = true;
                         std::cout << "Full Rebuild FPR\n";
                         index.replace_bin_path(std::move(full_rebuild_bin_path));
                         full_rebuild(arguments, index);
@@ -352,9 +353,6 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
                     }
                     else
                     {
-                        debug = true;
-                        // std::cout << "[DEBUG] Partial rebuild.\n";
-                        // some downstream fpr too high
                         std::cout << "Partial Rebuild FPR\n";
                         partial_rebuild(arguments, rebuild_location, index);
                     }
@@ -366,7 +364,6 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
                 // tmax too high
                 if (result == tmax_check::full_rebuild)
                 {
-                    debug = true;
                     std::cout << "Full Rebuild tmax\n";
                     index.replace_bin_path(std::move(full_rebuild_bin_path));
                     full_rebuild(arguments, index);
@@ -380,9 +377,6 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
                     partial_rebuild(arguments, detail::rebuild_location{parent.ibf_idx, parent.bin_idx}, index);
                 }
             }
-
-            // if (!debug)
-            //     std::cerr << "[DEBUG] Inplace.\n";
         }
     }
 
