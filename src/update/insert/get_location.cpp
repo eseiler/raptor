@@ -76,7 +76,7 @@ std::optional<size_t> find_empty_bin_idx(raptor_index<index_structure::hibf> & i
     if (mode == extension_mode::none || ibf_idx == 0uz || index.is_resized[ibf_idx])
         return std::nullopt;
 
-    if (mode == extension_mode::once && new_bin_count <= index.config().tmax * 2uz)
+    if (mode == extension_mode::once && new_bin_count <= index.config().tmax + 64uz)
     {
         ibf.increase_bin_number_to(seqan::hibf::bin_count{new_bin_count});
         return ibf_bin_count;
