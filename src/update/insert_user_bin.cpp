@@ -32,8 +32,19 @@ robin_hood::unordered_flat_set<uint64_t> compute_kmers(std::filesystem::path con
                                                        raptor_index<index_structure::hibf> const & index)
 {
     robin_hood::unordered_flat_set<uint64_t> kmers{};
-    raptor::file_reader<raptor::file_types::sequence> reader{index.shape(), static_cast<uint32_t>(index.window_size())};
-    reader.hash_into(ub_file, std::inserter(kmers, kmers.begin()));
+
+    std::variant<file_reader<file_types::sequence>, file_reader<file_types::minimiser>> reader;
+    if (ub_file.extension() == ".minimiser")
+        reader = file_reader<file_types::minimiser>{};
+    else
+        reader = file_reader<file_types::sequence>{index.shape(), static_cast<uint32_t>(index.window_size())};
+
+    std::visit(
+        [&](auto const & reader)
+        {
+            reader.hash_into(ub_file, std::inserter(kmers, kmers.begin()));
+        },
+        reader);
     return kmers;
 }
 
@@ -136,11 +147,34 @@ void partial_rebuild(update_arguments const & arguments,
         return result;
     }();
 
+    auto get_file_reader = [&index](std::filesystem::path const & path)
+    {
+        std::variant<file_reader<file_types::sequence>, file_reader<file_types::minimiser>> reader;
+        if (path.extension() == ".minimiser")
+            reader = file_reader<file_types::minimiser>{};
+        else
+            reader = file_reader<file_types::sequence>{index.shape(), static_cast<uint32_t>(index.window_size())};
+        return reader;
+    };
+
     auto input_fn = [&](size_t const user_bin_id, seqan::hibf::insert_iterator it)
     {
-        raptor::file_reader<raptor::file_types::sequence> reader{index.shape(),
-                                                                 static_cast<uint32_t>(index.window_size())};
-        reader.hash_into(index.bin_path()[ub_ids[user_bin_id]], it);
+        assert(std::ranges::all_of(index.bin_path()[ub_ids[user_bin_id]],
+                                   [](std::filesystem::path const & path)
+                                   {
+                                       return path.extension() == ".minimiser";
+                                   })
+               || std::ranges::none_of(index.bin_path()[ub_ids[user_bin_id]],
+                                       [](std::filesystem::path const & path)
+                                       {
+                                           return path.extension() == ".minimiser";
+                                       }));
+        std::visit(
+            [&](auto const & reader)
+            {
+                reader.hash_into(index.bin_path()[ub_ids[user_bin_id]], it);
+            },
+            get_file_reader(index.bin_path()[ub_ids[user_bin_id]].front()));
     };
 
     seqan::hibf::config config{index.config()};
@@ -255,10 +289,34 @@ void full_rebuild(update_arguments const & arguments, raptor_index<index_structu
     auto const shape = index.shape();
     auto const window_size = static_cast<uint32_t>(index.window_size());
 
+    auto get_file_reader = [shape, window_size](std::filesystem::path const & path)
+    {
+        std::variant<file_reader<file_types::sequence>, file_reader<file_types::minimiser>> reader;
+        if (path.extension() == ".minimiser")
+            reader = file_reader<file_types::minimiser>{};
+        else
+            reader = file_reader<file_types::sequence>{shape, window_size};
+        return reader;
+    };
+
     auto input_fn = [&](size_t const user_bin_id, seqan::hibf::insert_iterator it)
     {
-        raptor::file_reader<raptor::file_types::sequence> reader{shape, window_size};
-        reader.hash_into(bin_path[user_bin_id], it);
+        assert(std::ranges::all_of(bin_path[user_bin_id],
+                                   [](std::filesystem::path const & path)
+                                   {
+                                       return path.extension() == ".minimiser";
+                                   })
+               || std::ranges::none_of(bin_path[user_bin_id],
+                                       [](std::filesystem::path const & path)
+                                       {
+                                           return path.extension() == ".minimiser";
+                                       }));
+        std::visit(
+            [&](auto const & reader)
+            {
+                reader.hash_into(bin_path[user_bin_id], it);
+            },
+            get_file_reader(bin_path[user_bin_id].front()));
     };
 
     seqan::hibf::config config{index.config()};
