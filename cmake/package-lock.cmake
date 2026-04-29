@@ -18,7 +18,7 @@ CPMDeclarePackage (hibf
                    OPTIONS "INSTALL_HIBF OFF"
 )
 # sharg
-set (RAPTOR_SHARG_VERSION 1.2.1 CACHE STRING "")
+set (RAPTOR_SHARG_VERSION 1.2.2 CACHE STRING "")
 CPMDeclarePackage (sharg
                    NAME sharg
                    VERSION ${RAPTOR_SHARG_VERSION}
@@ -29,7 +29,7 @@ CPMDeclarePackage (sharg
                    OPTIONS "INSTALL_SHARG OFF" "INSTALL_TDL OFF" "CMAKE_MESSAGE_LOG_LEVEL WARNING" "BUILD_TESTING OFF"
 )
 # seqan3
-set (RAPTOR_SEQAN3_VERSION 3.4.0 CACHE STRING "")
+set (RAPTOR_SEQAN3_VERSION 3.4.2 CACHE STRING "")
 CPMDeclarePackage (seqan3
                    NAME seqan3
                    VERSION ${RAPTOR_SEQAN3_VERSION}
@@ -40,7 +40,7 @@ CPMDeclarePackage (seqan3
                    OPTIONS "INSTALL_SEQAN3 OFF" "CMAKE_MESSAGE_LOG_LEVEL WARNING"
 )
 # chopper
-set (RAPTOR_CHOPPER_VERSION d9980082ca7c477d6dba986bab0f10de0deba180 CACHE STRING "")
+set (RAPTOR_CHOPPER_VERSION 0d4d1071bf7c531ababbd6b7987e81990d108f6e CACHE STRING "")
 CPMDeclarePackage (chopper
                    NAME chopper
                    GIT_TAG ${RAPTOR_CHOPPER_VERSION} # main
@@ -82,7 +82,7 @@ CPMDeclarePackage (use_ccache
                    EXCLUDE_FROM_ALL TRUE
 )
 # doxygen-awesome
-set (RAPTOR_DOXYGEN_AWESOME_VERSION 2.4.1 CACHE STRING "")
+set (RAPTOR_DOXYGEN_AWESOME_VERSION 2.4.2 CACHE STRING "")
 CPMDeclarePackage (doxygen_awesome
                    NAME doxygen_awesome
                    VERSION ${RAPTOR_DOXYGEN_AWESOME_VERSION}

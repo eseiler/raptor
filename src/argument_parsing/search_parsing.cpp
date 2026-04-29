@@ -55,7 +55,7 @@ void fpga_check_kernel(search_arguments const & arguments)
 #    undef RAPTOR_TOSTRING
 }
 
-void fpga_checks(search_arguments const & arguments, size_t const max_query_length)
+void fpga_checks(search_arguments const & arguments, size_t const max_query_length, size_t const min_query_length)
 {
     if (!arguments.use_fpga)
         return;
@@ -78,6 +78,9 @@ void fpga_checks(search_arguments const & arguments, size_t const max_query_leng
     if (max_query_length > 250u)
         throw sharg::parser_error{"The query length is too long. The maximum is 250."};
 
+    if (min_query_length < 50u)
+        throw sharg::parser_error{"The query length is too short. The minimum is 50."};
+
     fpga_check_kernel(arguments);
 }
 
@@ -86,12 +89,13 @@ void init_fpga_parser(sharg::parser & parser, search_arguments & arguments)
     parser.add_subsection("FPGA options");
     parser.add_flag(arguments.use_fpga,
                     sharg::config{.short_id = '\0', .long_id = "fpga", .description = "Use the FPGA."});
-    parser.add_option(
-        arguments.buffer,
-        sharg::config{.short_id = '\0', .long_id = "buffers", .description = "The number of buffers to use."});
+    parser.add_option(arguments.buffer,
+                      sharg::config{.short_id = '\0',
+                                    .long_id = "buffer",
+                                    .description = "The size (in MiB) of the host side double buffer to use."});
     parser.add_option(
         arguments.kernels,
-        sharg::config{.short_id = '\0', .long_id = "kernels", .description = "The number of kernels to use."});
+        sharg::config{.short_id = '\0', .long_id = "kernels", .description = "The number of kernel copys to use."});
 }
 #endif
 
@@ -340,7 +344,7 @@ void search_parsing(sharg::parser & parser)
     }
 
 #if RAPTOR_FPGA
-    fpga_checks(arguments, max_query_length);
+    fpga_checks(arguments, max_query_length, min_query_length);
 #endif
 
     // ==========================================
