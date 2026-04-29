@@ -64,6 +64,10 @@ void init_insert_parser(sharg::parser & parser, update_arguments & arguments)
                                                  + bin_validator{}.get_help_page_message(),
                                     .required = true,
                                     .validator = sharg::input_file_validator{}});
+    parser.add_flag(arguments.disable_partial_rebuild,
+                    sharg::config{.short_id = '\0',
+                                  .long_id = "no-partial-rebuild",
+                                  .description = "Do not perform partial rebuilds, only full rebuilds."});
 }
 
 bool is_sequence_file(std::filesystem::path const & file_path)

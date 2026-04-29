@@ -409,6 +409,13 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
                         full_rebuild(arguments, index);
                         return;
                     }
+                    else if (arguments.disable_partial_rebuild)
+                    {
+                        std::cout << "Full Rebuild FPR No Partial\n";
+                        index.replace_bin_path(std::move(full_rebuild_bin_path));
+                        full_rebuild(arguments, index);
+                        return;
+                    }
                     else
                     {
                         std::cout << "Partial Rebuild FPR\n";
@@ -430,6 +437,13 @@ void insert_user_bin(update_arguments const & arguments, raptor_index<index_stru
 
                 if (result == tmax_check::partial_rebuild)
                 {
+                    if (arguments.disable_partial_rebuild)
+                    {
+                        std::cout << "Full Rebuild tmax No Partial\n";
+                        index.replace_bin_path(std::move(full_rebuild_bin_path));
+                        full_rebuild(arguments, index);
+                        return;
+                    }
                     auto const parent = index.ibf().prev_ibf_id[insert_location.ibf_idx];
                     std::cout << "Partial Rebuild tmax\n";
                     partial_rebuild(arguments, detail::rebuild_location{parent.ibf_idx, parent.bin_idx}, index);
