@@ -38,8 +38,10 @@ size_t required_technical_bins(required_technical_bins_parameters const & params
 
     size_t number_of_bins = seqan::hibf::divide_and_ceil(params.elements, params.max_elements);
 
-    while (compute_split_fpr(number_of_bins) > params.fpr)
+    while (number_of_bins <= params.limit && compute_split_fpr(number_of_bins) > params.fpr)
+    {
         ++number_of_bins;
+    }
 
     return number_of_bins;
 }
@@ -78,6 +80,7 @@ std::optional<size_t> find_empty_bin_idx(raptor_index<index_structure::hibf> & i
 
     if (mode == extension_mode::once && new_bin_count <= index.config().tmax + 64uz)
     {
+        index.is_resized[ibf_idx] = true;
         ibf.increase_bin_number_to(seqan::hibf::bin_count{new_bin_count});
         return ibf_bin_count;
     }
@@ -98,11 +101,24 @@ ibf_location find_ibf_size_splitting(std::vector<ibf_max> const & max_ibf_sizes,
 {
     // Create indices and sort by absolute difference from kmer_count
     std::vector<size_t> projection = seqan::hibf::iota_vector(max_ibf_sizes.size());
+    std::vector<size_t> weights = projection | std::views::transform([&](size_t const idx)
+    {
+        ibf_max const candidate = max_ibf_sizes[idx];
+        auto const & ibf = index.ibf().ibf_vector[candidate.ibf_idx];
+
+        size_t const number_of_bins = required_technical_bins({.bin_size = ibf.bin_size(),
+                                                                .elements = kmer_count,
+                                                                .fpr = index.fpr(),
+                                                                .hash_count = ibf.hash_function_count(),
+                                                                .max_elements = candidate.max_elements,
+                                                            .limit = index.config().tmax});
+
+        auto const diff = std::abs(static_cast<std::ptrdiff_t>(candidate.max_elements - kmer_count * number_of_bins));
+        return std::ceil(diff * std::sqrt(number_of_bins));
+    }) | std::ranges::to<std::vector<size_t>>();
 
     std::ranges::sort(projection, [&](size_t a, size_t b) {
-        auto diff_a = std::abs(static_cast<std::ptrdiff_t>(max_ibf_sizes[a].max_elements - kmer_count));
-        auto diff_b = std::abs(static_cast<std::ptrdiff_t>(max_ibf_sizes[b].max_elements - kmer_count));
-        return diff_a < diff_b;
+        return weights[a] < weights[b];
     });
 
     auto kernel = [&](extension_mode const extend_tmax) -> std::optional<ibf_location>
@@ -116,7 +132,8 @@ ibf_location find_ibf_size_splitting(std::vector<ibf_max> const & max_ibf_sizes,
                                                                    .elements = kmer_count,
                                                                    .fpr = index.fpr(),
                                                                    .hash_count = ibf.hash_function_count(),
-                                                                   .max_elements = candidate.max_elements});
+                                                                   .max_elements = candidate.max_elements,
+                                                            .limit = index.config().tmax});
 
             if (auto const bin_idx = find_empty_bin_idx(index, candidate.ibf_idx, number_of_bins, extend_tmax);
                  bin_idx.has_value())
@@ -130,14 +147,25 @@ ibf_location find_ibf_size_splitting(std::vector<ibf_max> const & max_ibf_sizes,
         return std::nullopt;
     };
 
-    if (auto const result = kernel(extension_mode::none); result.has_value())
-        return result.value();
+    size_t count_resized = [&](){
+        auto const & bit_vector = index.is_resized;
+        size_t const host_size = seqan::hibf::divide_and_ceil(bit_vector.size(), 64ull);
+        uint64_t const * const ptr = bit_vector.data();
+        size_t result{};
+        for (size_t i = 0; i < host_size; ++i)
+            result += std::popcount(*(ptr + i));
+        return result;
+    }();
 
-    if (auto const result = kernel(extension_mode::once); result.has_value())
-        return result.value();
-
-    if (auto const result = kernel(extension_mode::full); result.has_value())
-        return result.value();
+    if (count_resized < index.orig_size * 2)
+    {
+        if (auto const result = kernel(extension_mode::none); result.has_value())
+            return result.value();
+        if (auto const result = kernel(extension_mode::once); result.has_value())
+            return result.value();
+        if (auto const result = kernel(extension_mode::full); result.has_value())
+            return result.value();
+    }
 
     auto result = std::ranges::find_if(max_ibf_sizes,
                                        [](ibf_max const & m)
@@ -176,7 +204,8 @@ insert_location get_location(std::vector<ibf_max> const & max_ibf_sizes,
                                                            .elements = kmer_count,
                                                            .fpr = index.fpr(),
                                                            .hash_count = ibf.hash_function_count(),
-                                                           .max_elements = max_elements});
+                                                           .max_elements = max_elements,
+                                                            .limit = index.config().tmax});
 
     // uint64_t bin_idx = find_empty_bin_idx(index, ibf_idx, number_of_bins);
 

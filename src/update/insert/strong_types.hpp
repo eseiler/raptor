@@ -56,6 +56,7 @@ struct required_technical_bins_parameters
     double fpr{};
     size_t hash_count{};
     size_t max_elements{};
+    size_t limit{};
 };
 
 struct ibf_location
